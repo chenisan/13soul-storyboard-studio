@@ -122,7 +122,7 @@ function renderAssets() {
       <button class="small ghost" data-edit>編輯</button></div>`;
   $("#charList").innerHTML = p ? p.characters.map(c => item(c, "characters")).join("") : "";
   $("#sceneList").innerHTML = p ? p.scenes.map(c => item(c, "scenes")).join("") : "";
-  $("#assetToggle").textContent = p ? `角色卡 ${p.characters.length}／場景 ${p.scenes.length}` : "角色卡／場景";
+  $("#assetToggle .lbl").textContent = p ? `角色卡 ${p.characters.length}／場景 ${p.scenes.length}` : "角色卡／場景";
 }
 
 async function addFiles(kind, files) {
@@ -401,6 +401,28 @@ function addNote(s) {
   save(); renderNotes(s); updateSummaries(); renderStrip();
 }
 
+// ---------------- 單色線條圖示（24×24、1.6 線寬、顏色跟著文字） ----------------
+const ICONS = {
+  view: '<rect x="3" y="5" width="18" height="12" rx="1"/><path d="M8 21h8M12 17v4"/>',
+  basic: '<path d="M4 6h16M4 10h16M4 14h10M4 18h7"/>',
+  notes: '<path d="M5 5h14v10h-9l-4 4v-4H5z"/>',
+  bind: '<circle cx="9" cy="8" r="3"/><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5M15 5.5a3 3 0 0 1 0 5.5M17 14.5c1.6.7 2.8 2.2 3.3 4.5"/>',
+  camera: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="1.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
+  prompt: '<path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3zM13.5 8.5l3 3"/>',
+  seedance: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M7.5 4v16M16.5 4v16M3 9h4.5M3 15h4.5M16.5 9H21M16.5 15H21"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  settings: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+  assets: '<rect x="3" y="5" width="18" height="14" rx="1"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/>',
+  samples: '<rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/>',
+  download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="1"/><path d="M16 8V4H4v12h4"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  back: '<path d="M15 6l-6 6 6 6"/>',
+};
+const icon = name => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+// 靜態頁面上標了 data-icon 的按鈕補上圖示（漢堡選單等）
+for (const el of document.querySelectorAll("[data-icon]")) el.insertAdjacentHTML("afterbegin", icon(el.dataset.icon));
+
 // ---------------- 版面：左欄「鏡頭資料」選面板，右側工作區一次顯示一個（預設畫面與版本） ----------------
 const PANELS = [["view", "畫面與版本"], ["basic", "鏡頭內容"], ["notes", "備註給 Claude"], ["bind", "角色與場景"],
   ["camera", "鏡頭座標"], ["prompt", "提示詞"], ["seedance", "影片（Seedance 2.5）"]];
@@ -410,7 +432,7 @@ st.panel = PANELS.some(([k]) => k === localGet("studio.panel")) ? localGet("stud
 function decorateSections() {
   for (const card of document.querySelectorAll("#editor .card[data-sec]")) {
     if (card.dataset.sec === "view" || card.querySelector(":scope > .panel-head")) continue;
-    card.insertAdjacentHTML("afterbegin", `<div class="panel-head"><button type="button" class="ghost small" data-panel="view">← 回到畫面</button><b>${esc(card.dataset.title)}</b></div>`);
+    card.insertAdjacentHTML("afterbegin", `<div class="panel-head"><button type="button" class="ghost small" data-panel="view">${icon("back")}回到畫面</button>${icon(card.dataset.sec)}<b>${esc(card.dataset.title)}</b></div>`);
   }
   updateSummaries();
 }
@@ -466,7 +488,7 @@ function updateSummaries() {
     ["備註", o ? "wait" : r ? "ok" : "", o ? `${o} 則待處理` : r ? `${r} 則新回覆` : "沒有"],
   ].map(([k, t, v]) => `<div><span class="k">${k}</span><span class="tally ${t}"></span>${esc(v)}</div>`).join(""));
   set("#sheetRows", PANELS.map(([k, name]) => `<button type="button" class="srow ${st.panel === k ? "on" : ""}" data-panel="${k}">
-    <span class="name">${name}</span><span class="sum">${esc(sum[k] || "")}</span><span class="chev">›</span></button>`).join(""));
+    ${icon(k)}<span class="name">${name}</span><span class="sum">${esc(sum[k] || "")}</span><span class="chev">›</span></button>`).join(""));
 }
 
 // 下方分鏡列也可以收合
@@ -1540,12 +1562,12 @@ const menuPanel = $("#menuPanel");
 const setMenu = open => { menuPanel.hidden = !open; $("#menuBtn").setAttribute("aria-expanded", String(open)); $("#menuBtn").classList.toggle("on", open); };
 $("#menuBtn").onclick = e => { e.stopPropagation(); setAssetPanel(false); setMenu(menuPanel.hidden); };
 menuPanel.addEventListener("click", e => { if (e.target.closest("button")) setMenu(false); });
-document.addEventListener("click", e => { if (!menuPanel.hidden && !menuPanel.contains(e.target) && e.target.id !== "menuBtn") setMenu(false); }, true);
+document.addEventListener("click", e => { if (!menuPanel.hidden && !menuPanel.contains(e.target) && !e.target.closest("#menuBtn")) setMenu(false); }, true);
 document.addEventListener("keydown", e => { if (e.key === "Escape") setMenu(false); });
 document.addEventListener("keydown", e => { if (e.target.id === "noteNew" && e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addNote(shot()); } });
 document.addEventListener("click", e => {
   // 點面板外面收起；面板開出來的編輯視窗、放大圖不算外面
-  if (!assetPanel.hidden && !assetPanel.contains(e.target) && !e.target.closest("dialog") && e.target.id !== "assetToggle") setAssetPanel(false);
+  if (!assetPanel.hidden && !assetPanel.contains(e.target) && !e.target.closest("dialog") && !e.target.closest("#assetToggle")) setAssetPanel(false);
 }, true);
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#dlg").open) setAssetPanel(false); });
 $("#exportMd").onclick = exportMd;

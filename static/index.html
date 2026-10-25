@@ -16,18 +16,18 @@
   <span id="queueInfo" class="queue"></span>
   <span class="grow"></span>
   <span id="saveState" class="muted"></span>
-  <button id="menuBtn" class="ghost menu-btn" aria-label="選單" aria-expanded="false">☰</button>
+  <button id="menuBtn" class="ghost menu-btn" aria-label="選單" aria-expanded="false" data-icon="menu"></button>
 
   <!-- 漢堡選單：點項目、點外面或按 Esc 收起 -->
   <nav id="menuPanel" class="menu-pop" hidden>
-    <button id="newProject">＋ 新專案</button>
-    <button id="projectSettings">專案設定</button>
+    <button data-icon="plus" id="newProject">新專案</button>
+    <button data-icon="settings" id="projectSettings">專案設定</button>
     <hr>
-    <button id="assetToggle">角色卡／場景</button>
-    <button id="sampleBtn" title="同一個角色用不同鏡頭組合生成的對照圖">範例對照表</button>
+    <button data-icon="assets" id="assetToggle"><span class="lbl">角色卡／場景</span></button>
+    <button data-icon="samples" id="sampleBtn" title="同一個角色用不同鏡頭組合生成的對照圖">範例對照表</button>
     <hr>
-    <button id="exportMd">匯出分鏡表</button>
-    <button id="exportList">複製分鏡清單</button>
+    <button data-icon="download" id="exportMd">匯出分鏡表</button>
+    <button data-icon="copy" id="exportList">複製分鏡清單</button>
   </nav>
 
   <!-- 角色卡與場景：右上角按鈕展開的面板，點外面或按 Esc 收起 -->

@@ -403,3 +403,18 @@ dialog, .asset-pop, .menu-pop { border-radius: 4px; }
 .srow { width: 100%; min-width: 0; }
 .shot .id { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 * { scrollbar-color: #666 transparent; }
+
+/* 單色線條圖示 */
+.ico { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
+.srow .ico { color: var(--faint); }
+.srow:hover .ico, .srow.on .ico { color: var(--text); }
+.srow.on .name { color: var(--text); }
+.menu-pop button { display: flex; align-items: center; gap: 10px; font-weight: 400; }
+.menu-pop button .ico { color: var(--muted); }
+.menu-pop button:hover .ico { color: var(--text); }
+.menu-btn { display: inline-grid; place-items: center; padding: 5px 8px; }
+.menu-btn .ico { width: 18px; height: 18px; }
+.panel-head .ico { color: var(--muted); }
+.panel-head button { display: inline-flex; align-items: center; gap: 4px; }
+.panel-head button .ico { width: 14px; height: 14px; }
+.menu-pop button { border: 0; border-radius: 3px; }

@@ -1,4 +1,4 @@
-import { BODIES, LENSES, FOCALS, STOCKS, gearOf, migrateShotGear, midjourneyRefs } from "./camera.js";
+import { BODIES, LENSES, FOCALS, STOCKS, gearOf, migrateShotGear, midjourneyRefs, EN_LOOK, EN_RULES, ZH_LOOK, ZH_RULES } from "./camera.js";
 import { X, Y, Z, R, M, MODS, zOf, rOf, codeLine, checkShot, checkPair, buildPrompt, refsOf, wordDiff, charNameEn } from "./camera.js";
 import { Stage, POSES, colorOf, colorName } from "./stage3d.js";
 import { checkPair3d, DEFAULT_HEIGHT } from "./stagemath.js";
@@ -447,10 +447,15 @@ async function snapLayout(s) {
 
 function guideSentence(s, n) {
   const p = st.project;
+  if (p.lang === "zh") {
+    const whoZh = (s.chars || []).map(id => `${p.characters.find(c => c.id === id)?.name || id}是${COLOR_ZH[colorName(colorOf(p, id))] || colorName(colorOf(p, id))}的人形`).join("，");
+    return `圖片${n}只是從同一個機位算出的灰色方塊構圖示意：鏡頭角度、透視、取景範圍，以及每個角色的位置、大小與面向都照它${whoZh ? `（${whoZh}）` : ""}。不要畫出任何人形方塊、格線或箭頭。`;
+  }
   const who = (s.chars || []).map(id => `${charNameEn(p, id)} is the ${colorName(colorOf(p, id))} figure`).join(", ");
   return `Image ${n} is only a grey-block blocking guide rendered from the exact camera position: follow it for camera angle, lens perspective, framing, and each character's position, size and facing${who ? ` (${who})` : ""}. Do not draw any mannequins, blocks, grid lines or arrows.`;
 }
 
+const COLOR_ZH = { teal: "青綠色", white: "白色", "orange-red": "橘紅色", gold: "金色", blue: "藍色", violet: "紫色" };
 const autoPrompt = (s, kind) => buildPrompt(s, st.project, kind);
 
 // ---------------- 範例對照（「_範例」專案，由 make_samples.mjs 產生） ----------------
@@ -691,6 +696,7 @@ function refreshDerived() {
   const ta = $("#promptEn");
   if (document.activeElement !== ta) ta.value = man?.text ?? auto.en;
   $("#promptZh").value = auto.zh + (man ? "\n\n※ 英文提示詞已手改，中文對照仍是自動版內容。" : "");
+  $("#promptZh").closest(".field").hidden = p.lang === "zh" && kind !== "mj";
   $("#manualBadge").innerHTML = man ? '<span class="badge">已手改</span>' : '<span class="badge dim">自動</span>';
   $("#staleNote").textContent = man && man.base !== auto.en ? "選項變了，自動版已更新；你的手改版沒有被覆蓋。要套用新選項請按「還原成自動版」或看差異後手動調整。" : "";
   if (!$("#refs").contains(document.activeElement)) renderRefs(s);
@@ -1053,6 +1059,8 @@ async function copyShotList() {
 function projectSettings() {
   const p = st.project; if (!p) return;
   openDialog(`<h3>專案設定：${esc(p.name)}</h3>
+    <label class="field"><span>提示詞語言（Midjourney 一律英文）</span><select name="lang">
+      <option value="en" ${p.lang !== "zh" ? "selected" : ""}>英文</option><option value="zh" ${p.lang === "zh" ? "selected" : ""}>中文：鏡頭、參考圖說明、規則都用中文，可以直接看懂、直接改</option></select></label>
     <label class="field"><span>畫幅</span><select name="ratio">${Object.entries(RATIO_ZH).map(([k, v]) => `<option value="${k}" ${p.ratio === k ? "selected" : ""}>${v}</option>`).join("")}</select></label>
     <div class="field"><span>攝影設備預設（每顆分鏡可以個別覆蓋）</span><div class="row" style="gap:10px">
       ${[["body", BODIES, "機身"], ["lens", LENSES, "鏡頭"], ["stock", STOCKS, "底片（底片機身才會用到）"]].map(([k, list, label]) =>
@@ -1064,6 +1072,11 @@ function projectSettings() {
   (form, act) => {
     if (act === "ok") {
       for (const k of ["ratio", "look", "rules"]) p[k] = form.elements[k].value;
+      // 換語言時，質感與規則若還是另一種語言的預設文字，就換成這個語言的預設；自己改過的不動
+      const lang = form.elements.lang.value;
+      if (lang === "zh") { if (p.look.trim() === EN_LOOK) p.look = ZH_LOOK; if (p.rules.trim() === EN_RULES) p.rules = ZH_RULES; }
+      else { if (p.look.trim() === ZH_LOOK) p.look = EN_LOOK; if (p.rules.trim() === ZH_RULES) p.rules = EN_RULES; }
+      p.lang = lang;
       p.gear = Object.fromEntries(["body", "lens", "stock"].map(k => [k, form.elements["gear_" + k].value]).filter(([, v]) => v));
       save(); renderEditor(); renderStrip();
     }

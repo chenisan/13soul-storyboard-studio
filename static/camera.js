@@ -381,8 +381,144 @@ export function buildMidjourney(s, project) {
   return { en: text, zh, refs: roles.map(({ role, roleZh, ...r }) => r), roles };
 }
 
+// ---------------- 中文提示詞（專案設定「提示詞語言：中文」） ----------------
+// 2026-10 實測：逐句對應的全中文提示詞，景別、俯仰、方位的效果和英文版相當；重點一樣是寫具體、鏡頭放第一行。
+// {s} 會換成主體名稱，{o} 換成其他角色
+export const EN_LOOK = "Real skin with visible pores, matte, not oily, not plastic. Layered atmospheric depth.";
+export const EN_RULES = "Anatomically correct hands: five fingers each, a fist has the thumb outside, every hand connects to the correct forearm and shoulder. No digital sharpening, no HDR, no plastic skin, no video-game render look. No readable text, no logos, no watermark.";
+export const ZH_LOOK = "真實皮膚、看得見毛孔、霧面、不油亮、不塑膠感。空氣層次分明。";
+export const ZH_RULES = "手部解剖正確：每隻手五根手指，握拳時拇指在外，每隻手都接回正確的前臂與肩膀。不要數位銳化、不要 HDR、不要塑膠皮膚、不要電玩渲染感。不要任何可讀文字、商標或浮水印。";
+const ZH = {
+  Z: {
+    Z1: "大特寫：畫面只有{s}的眼睛和眉毛，從左到右填滿整個畫面；鼻子以下都不入鏡，沒有嘴巴、沒有肩膀、沒有身體",
+    Z2: "特寫：畫面只有{s}從下巴到額頭的整張臉；不見肩膀、不見衣服、不見身體",
+    Z3: "近景：頭和肩膀，畫面切在胸口中段",
+    Z4: "中近景：畫面切在腰部，腰部以下完全不入鏡",
+    Z5: "中景：畫面切在大腿中段，看得到雙手和臀部，看不到膝蓋",
+    Z6: "四分之三身景：畫面切在膝蓋上方，看不到腳",
+    Z7: "全景：從頭到腳整個身體都在畫面內，上下各留一點空間",
+    Z8: "遠景：{s}在畫面中很小，約占畫面高度三分之一，四周是環境",
+    Z9: "大遠景：{s}是畫面中很小的人影，不到畫面高度的十分之一，被廣闊的地景襯得渺小",
+  },
+  Y: {
+    Y1: "極低角度蟲視：鏡頭貼在地上，陡峭地往上拍{s}；看得到下巴底部，後方是天空或樹梢；{s}高高聳立在鏡頭上方",
+    Y2: "仰角：鏡頭在膝蓋高度，明顯往上拍{s}；地平線很低，{s}顯得有壓迫感",
+    Y3: "輕微仰角：鏡頭在胸口高度，稍微往上拍{s}",
+    Y4: "平視：鏡頭剛好在{s}眼睛的高度，水平、不傾斜",
+    Y5: "輕微俯角：鏡頭略高於{s}的頭頂，稍微往下拍",
+    Y6: "俯角：鏡頭在{s}上方高處，明顯往下拍；{s}四周露出大片地面，人顯得渺小",
+    Y7: "垂直頂視：鏡頭在{s}正上方，筆直往下拍到頭頂和肩膀；整個背景都是地面，看不到地平線和天空",
+  },
+  X: {
+    X1: "正面：{s}面對鏡頭",
+    X2: "從{s}的右前方，以四分之三正面角度拍攝",
+    X3: "正側面：從{s}的右側拍，{s}的身體和臉轉離鏡頭 90 度、朝畫面右方看；{s}不看鏡頭",
+    X4: "右後四分之三：從{s}右肩後方拍，看到背部和右肩，只露出一點臉頰；臉轉向別處，{s}不會轉頭看鏡頭",
+    X5: "正背面：鏡頭在{s}正後方，看到的是{s}的背部和後腦勺；完全看不到臉，{s}也不會轉頭看鏡頭",
+    X6: "左後四分之三：從{s}左肩後方拍，看到背部和左肩，只露出一點臉頰；臉轉向別處，{s}不會轉頭看鏡頭",
+    X7: "正側面：從{s}的左側拍，{s}的身體和臉轉離鏡頭 90 度、朝畫面左方看；{s}不看鏡頭",
+    X8: "從{s}的左前方，以四分之三正面角度拍攝",
+  },
+  R: {
+    single: "單人鏡頭：畫面中只有{s}，任何地方都沒有其他人", two: "雙人同框，兩個角色都清楚入鏡",
+    ots: "過肩鏡頭：越過{s}的肩膀拍向{o}，{o}的臉清楚可見", pov: "主觀鏡頭", fg: "前景有物件部分遮住畫面",
+  },
+  M: {
+    static: "鏡頭固定不動", push: "鏡頭緩慢推近{s}", pull: "鏡頭往後拉，露出周圍環境", orbit_ccw: "鏡頭逆時鐘環繞{s}",
+    orbit_cw: "鏡頭順時鐘環繞{s}", rotate: "鏡頭沿光軸翻轉旋轉", crane_up: "鏡頭升高", crane_down: "鏡頭下降",
+    track: "跟拍{s}", whip: "快速甩鏡", handheld: "手持攝影，帶輕微漂移",
+  },
+  // 修飾：[首幀, 影片]
+  MOD: {
+    backlit: ["強烈逆光，人物呈剪影", "強烈逆光剪影"], sidelight: ["硬側光勾勒臉部與身形", "硬側光"], toplight: ["正上方的頂光", "頂光"],
+    rim: ["輪廓光勾出人物邊緣", "輪廓光"], sunset: ["低角度溫暖的夕陽光", "低角度溫暖的夕陽光"], volumetric: ["分層的薄霧與體積光束", "分層的薄霧與體積光束"],
+    bokeh: ["淺景深，大光圈，背景柔和虛化", "淺景深"], deep: ["全景深，前後都清楚", "全景深"], rackfocus: ["焦點落在前景主體", "在前景與背景之間移焦"],
+    slowmo: ["凝結的瞬間，碎屑與衣料懸在空中", "慢動作，高影格率"], freeze: ["高速快門，動作清晰凝結", "高速快門，動作清晰凝結"],
+    blur: ["移動中的肢體帶動態模糊", "自然的動態模糊"], dutch: ["荷蘭角，地平線傾斜", "荷蘭角"], symmetry: ["嚴格的幾何對稱構圖", "對稱構圖"],
+    thirds: ["三分法構圖", "三分法構圖"], frame: ["框中框構圖", "框中框構圖"], negative: ["主體四周大片留白", "大片留白"],
+    flare: ["畫面中有光源造成的輕微鏡頭光斑", "輕微鏡頭光斑"],
+  },
+  FOCAL: {
+    14: "14mm 超廣角貼近主體：強烈透視變形、景深誇張，近處的身體部位顯得較大，背景被拉得很遠", 18: "很廣的鏡頭貼近主體：明顯透視變形，空間很深",
+    24: "廣角透視", 35: "自然、略廣的透視", 50: "標準透視", 85: "人像鏡頭的柔和壓縮", 100: "望遠壓縮",
+    135: "135mm 望遠從遠處拍：透視被壓平，背景被壓縮、顯得又大又近，景深很淺",
+  },
+  LENS: {
+    cooke_s4: "溫潤柔和的 Cooke 質感", cooke_panchro: "復古球面鏡頭，低對比，邊緣柔和", zeiss_mp: "極銳利、乾淨的現代質感",
+    zeiss_ss: "大光圈復古鏡頭，焦外柔和", canon_k35: "70 年代的溫暖色調，輕微光暈與光斑", leica_summilux: "細緻，圓潤柔和的散景",
+    pana_c: "變形寬銀幕鏡頭，橢圓散景，藍色橫向光斑", atlas_orion: "變形寬銀幕鏡頭，橢圓散景，琥珀色橫向光斑",
+    helios44: "蘇聯復古鏡頭，旋轉散景", zeiss_macro: "微距鏡頭，極近距離的細節",
+  },
+  BODY: {
+    alexa35: "高光柔和滾降，溫和的電影對比，自然膚色", alexa65: "65mm 大片幅感光元件，極淺景深，沉浸的空間感",
+    venice2: "全片幅，畫面乾淨、暗部細節豐富", vraptor: "全片幅，銳利的高解析細節", dxl2: "大片幅，濃郁的電影色彩",
+    arricam: "35mm 電影底片攝影機", imax: "IMAX 15 齒孔 65mm 底片，極大量的畫面細節與景深", bolex: "16mm 底片攝影機，粗顆粒，復古獨立電影質感",
+  },
+  STOCK: {
+    v3_500t_push: "Kodak Vision3 500T 底片增感一級：自然有機的底片顆粒，高光柔和滾降並帶輕微光暈，黑位帶底片灰霧感",
+    v3_500t: "Kodak Vision3 500T 燈光片：細緻的有機顆粒，高光柔和滾降，輕微光暈",
+    v3_250d: "Kodak Vision3 250D 日光片：細顆粒，自然的日光色彩", v3_50d: "Kodak Vision3 50D：極細顆粒，飽和乾淨的色彩",
+    doublex: "Kodak Double-X 黑白底片：經典的單色顆粒與對比",
+  },
+};
+// 中文「臉要看得見」類句子（背面、側面鏡頭要拿掉）
+const FACE_VISIBLE_ZH = /[^。；，,;.]*(臉|眼睛|五官)[^。；，,;.]*(看得見|看得到|可見|露出|清楚)[^。；，,;.]*[。；，,;.]?/g;
+
+function buildPromptZh(s, project, kind) {
+  const fill = (t, subj, others) => t.replaceAll("{s}", subj).replaceAll("{o}", others);
+  const subjC = project.characters.find(c => c.id === s.subject);
+  const subj = subjC?.name || "主體";
+  const others = (s.chars || []).filter(c => c !== s.subject).map(c => charName(project, c)).join("和") || "另一人";
+  const away = s.x ? xOf(s.x).away : null;
+  const tight = s.z === "Z1" || s.z === "Z2";
+  const cam = [];
+  if (s.z) cam.push(ZH.Z[s.z]);
+  if (s.y) cam.push(ZH.Y[s.y]);
+  if (s.x) cam.push(ZH.X[s.x]);
+  cam.push(ZH.R[s.r || "single"]);
+  if (kind === "video" && s.m) cam.push(ZH.M[s.m]);
+  const gear = gearOf(s, project);
+  if (gear.body || gear.lens || gear.focal) {
+    const lensPart = [gear.lens?.name, gear.focal && `${gear.focal}mm`].filter(Boolean).join(" ");
+    cam.push(`使用 ${[gear.body?.name, lensPart && `${gear.body ? "搭配 " : ""}${lensPart} 鏡頭`].filter(Boolean).join(" ")}`);
+    if (gear.focal) cam.push(ZH.FOCAL[gear.focal]);
+    if (gear.lens) cam.push(ZH.LENS[gear.lens.id]);
+    if (gear.body) cam.push(ZH.BODY[gear.body.id]);
+  }
+  for (const m of s.mods || []) if (ZH.MOD[m]) cam.push(ZH.MOD[m][kind === "video" ? 1 : 0]);
+  const out = [`鏡頭（最重要，務必照做）：${cam.filter(Boolean).map(t => fill(t, subj, others)).join("，")}。`];
+  out.push(kind === "still" ? "單張電影劇照，單一連續場景，不拼貼、不分格。" : "電影實拍鏡頭。");
+  const refs = refsOf(s, project);
+  if (refs.length) {
+    const label = r => r.kind === "extra" ? (r.labelZh === "額外參考圖" ? "額外參考圖" : `額外參考：${r.labelZh}`)
+      : r.label.startsWith("location") ? `${r.labelZh.replace(/ 場景$/, "")}的場景參考圖` : `${r.labelZh.replace(/ 角色卡$/, "")}的角色參考圖`;
+    const keep = away === "back" ? "每個角色的髮型、身形和服裝（包含背面）都要和參考圖完全一致；這顆鏡頭裡臉朝向別處"
+      : away === "profile" ? "每個角色的臉（以側面呈現）、髮型、服裝都要和參考圖完全一致" : "每個角色的臉、髮型、服裝都要和參考圖完全一致";
+    out.push(refs.map((r, i) => `圖片${i + 1}是${label(r)}`).join("；") + `。${keep}；環境、光線方向和空氣感照場景參考圖。`);
+  }
+  if (s.action?.trim()) {
+    out.push(`畫面內容：${s.action.trim()}`);
+    if (tight) out.push("畫面內容裡的身體、姿勢或服裝細節都在這個很緊的畫面外，不能因此把畫面拉寬。");
+  }
+  for (const id of s.chars || []) {
+    const c = project.characters.find(c => c.id === id);
+    if (!c) continue;
+    const lock = away ? stripFaceVisible(c.lock).replace(FACE_VISIBLE_ZH, "").trim() : c.lock;
+    const desc = [lock, c.outfit].filter(x => x?.trim()).join(" ");
+    if (desc) out.push(`${c.name}：${desc}`);
+  }
+  const sc = project.scenes.find(x => x.id === s.scene);
+  if (sc?.desc?.trim()) out.push(`場景：${sc.desc.trim()}`);
+  if (gear.stock) out.push(`${ZH.STOCK[gear.stock.id]}。`);
+  if (project.look?.trim()) out.push(project.look.trim());
+  if (project.rules?.trim()) out.push(project.rules.trim());
+  const text = out.join("\n");
+  return { en: text, zh: text, refs };
+}
+
 export function buildPrompt(s, project, kind = "still") {
-  if (kind === "mj") return buildMidjourney(s, project);
+  if (kind === "mj") return buildMidjourney(s, project);  // Midjourney 一律英文
+  if (project.lang === "zh") return buildPromptZh(s, project, kind);
   const refs = refsOf(s, project);
   const en = [], zh = [];
   const away = s.x ? xOf(s.x).away : null;  // back／profile：臉不朝鏡頭

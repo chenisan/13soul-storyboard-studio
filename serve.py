@@ -71,6 +71,13 @@ def write_json(path: Path, data) -> None:
     tmp.replace(path)
 
 
+def inside(base: Path, rel: str) -> Path | None:
+    """rel 解析後必須在 base 資料夾內，否則回傳 None（擋路徑穿越與絕對路徑）"""
+    base = base.resolve()
+    p = (base / rel).resolve()
+    return p if base in p.parents else None
+
+
 def unique_path(folder: Path, filename: str) -> Path:
     """同名不覆蓋：自動加 _v2、_v3 …"""
     folder.mkdir(parents=True, exist_ok=True)
@@ -132,7 +139,8 @@ def worker() -> None:
         cmd = [sys.executable, "-u", str(GEN_PY), job["prompt"], "--ratio", job["ratio"],
                "--out", str(frames), "--filename", stem]
         for r in job["refs"]:
-            cmd += ["--ref", str(pdir / r)]
+            if f := inside(pdir, r):
+                cmd += ["--ref", str(f)]
         try:
             with open(log_file, "w", encoding="utf-8", errors="replace") as lf:
                 rc = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT, cwd=str(frames),
@@ -220,7 +228,7 @@ def rewrite_action(body: dict) -> str:
 def enqueue(p: str, body: dict) -> dict:
     sid = body["shot_id"]
     pdir = project_dir(p)
-    refs = [r for r in body.get("refs", []) if (pdir / r).is_file()]
+    refs = [r for r in body.get("refs", []) if (f := inside(pdir, r)) and f.is_file()]  # 只接受專案內的檔案
     with lock:
         g = read_json(gens_path(p), {})
         entry = g.setdefault(sid, {"versions": [], "current": None})
@@ -279,7 +287,26 @@ class Handler(BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path)
         return urllib.parse.unquote(u.path), {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
 
+    def allowed(self, write: bool) -> bool:
+        """只服務本機網頁：
+        - Host 必須是 127.0.0.1／localhost（擋 DNS rebinding：惡意網域解析到 127.0.0.1 後讀取回應）
+        - 寫入類請求若帶 Origin，必須是本機網頁（擋惡意網頁在背後跨站送出請求）；
+          沒有 Origin 的是 curl、make_samples.mjs 這類本機程式，瀏覽器跨站一定會帶 Origin"""
+        port = self.server.server_address[1]
+        local = {f"127.0.0.1:{port}", f"localhost:{port}"}
+        if self.headers.get("Host", "") not in local:
+            return False
+        if write:
+            origin = self.headers.get("Origin")
+            if origin is not None and origin not in {f"http://{h}" for h in local}:
+                return False
+            if self.headers.get("Sec-Fetch-Site") not in (None, "same-origin", "none"):
+                return False
+        return True
+
     def do_GET(self):
+        if not self.allowed(write=False):
+            return self.send_error(403, "forbidden")
         path, q = self.parts()
         try:
             if path == "/":
@@ -319,13 +346,15 @@ class Handler(BaseHTTPRequestHandler):
                     rows.append(row)
                 return self.send_json(rows)
             if path == "/api/log":
-                f = (project_dir(q["p"]) / q["path"]).resolve()
-                return self.send_json({"text": f.read_text(encoding="utf-8", errors="replace")[-6000:] if f.exists() else ""})
+                f = inside(project_dir(q["p"]) / "frames" / "logs", Path(q["path"]).name)  # 只能讀生成紀錄資料夾
+                return self.send_json({"text": f.read_text(encoding="utf-8", errors="replace")[-6000:] if f and f.is_file() else ""})
             self.send_error(404)
         except Exception as e:  # noqa: BLE001
             self.send_json({"error": str(e)}, 500)
 
     def do_POST(self):
+        if not self.allowed(write=True):
+            return self.send_error(403, "forbidden")
         path, q = self.parts()
         try:
             if path == "/api/projects":

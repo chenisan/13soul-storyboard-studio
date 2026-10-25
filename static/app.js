@@ -85,8 +85,8 @@ const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(
 // ---------------- 左側：角色卡、場景 ----------------
 function renderAssets() {
   const p = st.project;
-  const item = (a, kind) => `<div class="asset" data-kind="${kind}" data-id="${a.id}">
-      <img src="${fileUrl(a.image)}" data-zoom="${a.image}" alt="">
+  const item = (a, kind) => `<div class="asset" data-kind="${kind}" data-id="${esc(a.id)}">
+      <img src="${fileUrl(a.image)}" data-zoom="${esc(a.image)}" alt="">
       <div><div class="name">${esc(a.name)}</div><div class="sub">${esc(kind === "characters" ? (a.lock || "（未填鎖定描述）") : (a.desc || "（未填場景描述）"))}</div></div>
       <button class="small ghost" data-edit>編輯</button></div>`;
   $("#charList").innerHTML = p ? p.characters.map(c => item(c, "characters")).join("") : "";
@@ -248,11 +248,11 @@ function renderEditor() {
   <div class="card">
     <h3>綁定角色卡與場景</h3>
     <div class="field"><span>出場角色（可多選）</span><div class="chips">${p.characters.map(c =>
-      chip(s.chars?.includes(c.id), `data-char="${c.id}"`, `<img src="${fileUrl(c.image)}">${esc(c.name)}`)).join("") || '<span class="muted">左側先上傳角色卡</span>'}</div></div>
+      chip(s.chars?.includes(c.id), `data-char="${esc(c.id)}"`, `<img src="${fileUrl(c.image)}">${esc(c.name)}`)).join("") || '<span class="muted">左側先上傳角色卡</span>'}</div></div>
     <div class="field" style="margin-top:8px"><span>主體（X 方位以誰的臉部朝向為 0°）</span><div class="chips">${(s.chars || []).map(id =>
-      chip(s.subject === id, `data-subject="${id}"`, esc(p.characters.find(c => c.id === id)?.name))).join("") || '<span class="muted">先勾選角色</span>'}</div></div>
+      chip(s.subject === id, `data-subject="${esc(id)}"`, esc(p.characters.find(c => c.id === id)?.name))).join("") || '<span class="muted">先勾選角色</span>'}</div></div>
     <div class="field" style="margin-top:8px"><span>場景</span><div class="chips">${chip(!s.scene, `data-scene=""`, "不綁")}${p.scenes.map(c =>
-      chip(s.scene === c.id, `data-scene="${c.id}"`, `<img src="${fileUrl(c.image)}">${esc(c.name)}`)).join("")}</div></div>
+      chip(s.scene === c.id, `data-scene="${esc(c.id)}"`, `<img src="${fileUrl(c.image)}">${esc(c.name)}`)).join("")}</div></div>
   </div>
 
   <div class="card">
@@ -266,7 +266,7 @@ function renderEditor() {
       <button class="small ghost" id="addBlock">＋佈景方塊</button>
       <span class="grow"></span>
       <button class="small ghost" id="snapBtn">拍下構圖</button>
-      ${s.layout ? `<img class="layout-th" src="${fileUrl(s.layout)}" data-zoom="${s.layout}" title="最近一次構圖截圖">` : ""}
+      ${s.layout ? `<img class="layout-th" src="${fileUrl(s.layout)}" data-zoom="${esc(s.layout)}" title="最近一次構圖截圖">` : ""}
     </div><div id="stageHost"></div><div id="inspector" class="inspector"></div>` : ""}
     <div class="pickers">
       <div class="picker"><div class="muted">X 方位（俯視，主體面向上方）</div>${xDial(s)}
@@ -546,7 +546,7 @@ function renderRefs(s) {
       <button class="ref-x" data-refx="${esc(r.key)}" title="${r.excluded ? "恢復" : r.kind === "extra" ? "移除這張額外參考圖" : "這顆鏡頭不送這張"}">${r.excluded ? "↺" : "✕"}</button>
       <img src="${fileUrl(r.path)}" data-zoom="${esc(r.path)}">
       <b>${num}</b><span>${r.kind === "extra" ? "額外" : esc(r.labelZh)}</span>
-      ${extra ? `<input type="text" data-refnote="${extra.id}" value="${esc(extra.note || "")}" placeholder="用途，例：劍的造型">` : ""}</div>`;
+      ${extra ? `<input type="text" data-refnote="${esc(extra.id)}" value="${esc(extra.note || "")}" placeholder="用途，例：劍的造型">` : ""}</div>`;
   }).join("") + `<div class="ref ref-add" id="refAdd" title="加入參考圖">＋<span>加入</span></div>`;
 }
 
@@ -580,7 +580,7 @@ function openAddRef() {
       <div class="drop" id="refDrop">拖曳圖片到這裡，或 <label class="btn small">選擇檔案<input type="file" accept="image/*" multiple hidden name="file"></label>
       　<button type="button" class="small ghost" data-act="path">貼本機路徑</button></div></div>
     <div class="field"><span>其他鏡頭的成圖（保持連戲）</span><div class="refs">${frames.map(f =>
-      pick(`data-act="frame" data-path="${esc(f.file)}" data-sid="${f.sid}"`, f.file, `${f.sid} v${f.v}${f.cur ? " 現行" : ""}`)).join("") || '<span class="muted">還沒有成圖</span>'}</div></div>
+      pick(`data-act="frame" data-path="${esc(f.file)}" data-sid="${esc(f.sid)}"`, f.file, `${f.sid} v${f.v}${f.cur ? " 現行" : ""}`)).join("") || '<span class="muted">還沒有成圖</span>'}</div></div>
     <div class="field"><span>專案的角色卡與場景</span><div class="refs">${[...p.characters.map(c => ({ path: c.image, cap: c.name, note: `${c.name_en || c.name} character reference` })),
       ...p.scenes.map(c => ({ path: c.image, cap: c.name, note: `${c.name_en || c.name} location reference` }))].map(a =>
       pick(`data-act="asset" data-path="${esc(a.path)}" data-note="${esc(a.note)}"`, a.path, esc(a.cap))).join("")}</div></div>
@@ -839,8 +839,8 @@ function renderStrip() {
   $("#shotStrip").innerHTML = p.shots.map(s => {
     const g = st.gens[s.id], v = g?.versions.find(x => x.v === g.current);
     const errs = checkShot(s, p).filter(w => w.level === "error").length;
-    return `<div class="shot ${s.id === st.cur ? "on" : ""}" data-shot="${s.id}">
-      <div class="th">${v?.file ? `<img src="${fileUrl(v.file)}">` : (s.z ? `${s.z}·${s.y || "?"}` : "—")}${activeJobs(s.id).length ? '<div class="th-busy"><div class="spin"></div></div>' : ""}</div>
+    return `<div class="shot ${s.id === st.cur ? "on" : ""}" data-shot="${esc(s.id)}">
+      <div class="th">${v?.file ? `<img src="${fileUrl(v.file)}">` : (s.z ? `${esc(s.z)}·${esc(s.y || "?")}` : "—")}${activeJobs(s.id).length ? '<div class="th-busy"><div class="spin"></div></div>' : ""}</div>
       <div class="id">${esc(s.id)} ${errs ? '<span class="badge err">!</span>' : ""} ${esc(s.title || "")}</div>
       <div class="cd">${esc(codeLine(s, p) || "未設定")}</div></div>`;
   }).join("") + `<div class="shot add" id="addShot" title="新增分鏡">＋</div>`;
@@ -899,7 +899,7 @@ async function refreshGens(force) {
     }
     const active = st.queue.filter(j => j.state === "queued" || j.state === "running");
     const run = active.find(j => j.state === "running");
-    $("#queueInfo").innerHTML = active.length ? `<span class="spin tiny"></span> 生成中：${run ? `${run.shot_id} v${run.v}（<span data-start="${startOf(run)}">${mmss(Date.now() - startOf(run))}</span>，${esc(run.tail || "")}）` : "—"}　等待 ${active.length - (run ? 1 : 0)}` : "";
+    $("#queueInfo").innerHTML = active.length ? `<span class="spin tiny"></span> 生成中：${run ? `${esc(run.shot_id)} v${run.v}（<span data-start="${startOf(run)}">${mmss(Date.now() - startOf(run))}</span>，${esc(run.tail || "")}）` : "—"}　等待 ${active.length - (run ? 1 : 0)}` : "";
     if (force || st.queue.some(j => j.state === "queued" || j.state === "running") || st._hadQueue) {
       st.gens = await api(`/api/gens?${q()}`);
       renderVersions(); renderStrip();

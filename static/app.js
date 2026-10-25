@@ -735,10 +735,14 @@ const SAMPLE_GROUPS = [
   { axis: "z", title: "Z 景別（平視、右前 ¾、50mm）", items: Z.map(z => [z.id, `${z.id} ${z.zh}`]) },
   { axis: "y", title: "Y 俯仰（四分之三身景、右前 ¾）", items: Y.map(y => [y.id, `${y.id} ${y.zh}`]) },
   { axis: "x", title: "X 方位（四分之三身景、平視）", items: X.map(x => [x.id, `${x.id} ${x.zh}`]) },
-  { axis: "f", title: "焦段（都框成腰部以上，看透視差異）", items: [14, 24, 50, 85, 135].map(mm => [String(mm), `${mm}mm`]) },
-  { axis: "l", title: "鏡頭（50mm、同一構圖）", items: ["cooke_s4", "pana_c", "helios44", "zeiss_mp"].map(id => [id, LENSES.find(l => l.id === id).name]) },
-  { axis: "b", title: "機身／底片（50mm、同一構圖）", items: [["arricam", "Arricam 35mm＋Vision3 500T（基準）"], ["alexa35", "ARRI Alexa 35（數位）"], ["bolex", "Bolex 16mm＋500T"], ["doublex", "35mm＋Double-X 黑白"]] },
+  { axis: "f", title: "焦段（都框成腰部以上，看透視差異）", items: FOCALS.map(f => [String(f.mm), `${f.mm}mm`]) },
+  { axis: "l", title: "鏡頭（50mm、同一構圖；微距用大特寫）", items: LENSES.map(l => [l.id, l.name]) },
+  { axis: "b", title: "機身（50mm、同一構圖）", items: BODIES.map(b => [b.id, `${b.name}（${b.fmt}）`]) },
+  { axis: "s", title: "底片（Arricam 35mm 底片機身）", items: STOCKS.map(x => [x.id, x.name]) },
+  // 修飾每一類一組，共用代號 m；找組別時要同時比對值
+  ...MODS.map(g => ({ axis: "m", title: `修飾：${g.group}（50mm、同一構圖）`, items: g.items.map(i => [i.id, i.zh]) })),
 ];
+const sampleGroupOf = (axis, val) => SAMPLE_GROUPS.find(g => g.axis === axis && g.items.some(([v]) => v === val));
 const sampleUrl = path => `/files/${encodeURIComponent(SAMPLE_P)}/${path.split("/").map(encodeURIComponent).join("/")}`;
 st.samples = {};  // "z:Z3" → {file, status, shot}
 async function loadSamples() {
@@ -770,11 +774,12 @@ function sampleKeyOf(el) {
   if (d.y) return `y:${d.y}`;
   if (d.x) return `x:${d.x}`;
   if (d.focal) return `f:${d.focal}`;
-  if (d.gear) { const g = gearOf(shot(), st.project); return d.gear === "lens" ? `l:${g.lens?.id}` : d.gear === "body" ? `b:${g.body?.id}` : null; }
+  if (d.mod) return `m:${d.mod}`;
+  if (d.gear) { const g = gearOf(shot(), st.project); return { lens: `l:${g.lens?.id}`, body: `b:${g.body?.id}`, stock: `s:${g.stock?.id}` }[d.gear] || null; }
   return null;
 }
 document.addEventListener("mouseover", e => {
-  const el = e.target.closest?.("#editor [data-z], #editor [data-y], #editor [data-x], #editor [data-focal], #editor [data-gear]");
+  const el = e.target.closest?.("#editor [data-z], #editor [data-y], #editor [data-x], #editor [data-focal], #editor [data-mod], #editor [data-gear]");
   const tip = $("#sampleTip");
   const smp = el && st.samples[sampleKeyOf(el)];
   if (!smp || !smp.file) { tip.hidden = true; return; }
@@ -804,15 +809,15 @@ function samplesHtml() {
 }
 
 // 範例格與分鏡設定的對應（機身組同時決定底片）
-const SAMPLE_BODY = { arricam: { body: "arricam", stock: "v3_500t_push" }, alexa35: { body: "alexa35", stock: null },
-  bolex: { body: "bolex", stock: "v3_500t" }, doublex: { body: "arricam", stock: "doublex" } };
 function sampleSelected(s, axis, val) {
   const g = gearOf(s, st.project);
   if (axis === "z" || axis === "y" || axis === "x") return s[axis] === val;
   if (axis === "f") return g.focal === +val;
   if (axis === "l") return g.lens?.id === val;
-  const b = SAMPLE_BODY[val];
-  return b && g.body?.id === b.body && (g.stock?.id || null) === b.stock;
+  if (axis === "b") return g.body?.id === val;
+  if (axis === "s") return g.stock?.id === val;
+  if (axis === "m") return (s.mods || []).includes(val);
+  return false;
 }
 function applySample(axis, val) {
   const s = shot();
@@ -821,12 +826,15 @@ function applySample(axis, val) {
   if (axis === "z" || axis === "y" || axis === "x") s[axis] = val;
   else if (axis === "f") s.gear.focal = +val;
   else if (axis === "l") s.gear.lens = val;
-  else if (axis === "b") for (const [k, v] of Object.entries(SAMPLE_BODY[val])) { if (v) s.gear[k] = v; else delete s.gear[k]; }
+  else if (axis === "b") s.gear.body = val;
+  else if (axis === "s") { s.gear.stock = val; if (!gearOf(s, st.project).body?.film) s.gear.body = "arricam"; }  // 底片只對底片機身有效
+  else if (axis === "m") s.mods = (s.mods || []).includes(val) ? s.mods.filter(m => m !== val) : [...(s.mods || []), val];  // 修飾可以疊加，再點一次取消
   save(); renderEditor(); renderStrip();
-  const group = SAMPLE_GROUPS.find(g => g.axis === axis);
+  const group = sampleGroupOf(axis, val);
   const label = group?.items.find(([v]) => v === val)?.[1] || val;
+  if (axis === "m" && !s.mods.includes(val)) { st.sampleApplied = (st.sampleApplied || []).filter(x => x !== label); return toast(`已取消「${label}」`); }
   // 同一組只留最後選的那個
-  st.sampleApplied = [...(st.sampleApplied || []).filter(x => !group?.items.some(([, l]) => l === x)), label];
+  st.sampleApplied = [...(st.sampleApplied || []).filter(x => x !== label && (axis === "m" || !group?.items.some(([, l]) => l === x))), label];
   toast(`已套用「${label}」到 ${s.id}`);
 }
 
@@ -834,9 +842,10 @@ function applySample(axis, val) {
 let lightboxKeys = () => {};
 document.addEventListener("keydown", e => lightboxKeys(e));
 function openLightbox(key) {
-  const [axis] = key.split(":");
-  const group = SAMPLE_GROUPS.find(g => g.axis === axis);
+  const [axis, ...rv] = key.split(":");
+  const group = sampleGroupOf(axis, rv.join(":")) || SAMPLE_GROUPS.find(g => g.axis === axis);
   const keys = group.items.map(([v]) => `${axis}:${v}`).filter(k => st.samples[k]?.file);  // 只列已經生好的
+  if (!keys.length) return toast("這組還沒有範例圖");
   let i = Math.max(0, keys.indexOf(key));
   const lb = $("#lightbox");
   const render = () => {
@@ -886,9 +895,11 @@ function openSamples() {
 // ---------------- 攝影設備 ----------------
 function gearSelect(kind, list, value, defId, label) {
   const def = list.find(x => x.id === defId);
-  return `<label class="gear-sel">${label}<select data-gear="${kind}">
+  const axis = { body: "b", lens: "l", stock: "s" }[kind];
+  return `<span class="gear-sel"><label>${label}<select data-gear="${kind}">
     <option value="">${def ? `專案預設：${esc(def.name)}` : "不指定"}</option>
-    ${list.map(x => `<option value="${x.id}" ${value === x.id ? "selected" : ""}>${esc(x.name)}${x.fmt ? `（${x.fmt}）` : x.type ? `（${x.type}）` : ""}</option>`).join("")}</select></label>`;
+    ${list.map(x => `<option value="${x.id}" ${value === x.id ? "selected" : ""}>${esc(x.name)}${x.fmt ? `（${x.fmt}）` : x.type ? `（${x.type}）` : ""}</option>`).join("")}</select></label>
+    <button type="button" class="ghost small gear-zoom" data-zoomsample="${axis}:${esc(value || defId || list[0].id)}" title="放大比較這一組範例" aria-label="看${label}範例">${icon("zoom")}</button></span>`;
 }
 function gearHtml(s) {
   const p = st.project, g = s.gear || {}, d = p.gear || {}, eff = gearOf(s, p);
@@ -1441,6 +1452,8 @@ document.addEventListener("click", e => {
   if (!t.closest("#editor")) return;
   const pn = t.closest("[data-panel]");
   if (pn) { setPanel(pn.dataset.panel); return; }
+  const zsm = t.closest("[data-zoomsample]");
+  if (zsm) { loadSamples().then(() => openLightbox(zsm.dataset.zoomsample)); return; }
   const s = shot(); if (!s) return;
   if (t.id === "viewGen") { openGenerate(); return; }
   const rv = t.closest("[data-review]");

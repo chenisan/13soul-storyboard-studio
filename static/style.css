@@ -445,3 +445,8 @@ dialog, .asset-pop, .menu-pop { border-radius: 4px; }
 .lb-nav { height: 100%; background: transparent; border: 0; color: var(--muted); display: grid; place-items: center; padding: 0; }
 .lb-nav:hover { color: var(--text); background: rgba(255, 255, 255, .04); }
 .lb-nav .ico { width: 28px; height: 28px; }
+
+/* 攝影設備下拉選單旁的放大鏡 */
+.gear-sel { display: inline-flex; align-items: center; gap: 4px; }
+.gear-sel label { display: inline-flex; gap: 6px; align-items: center; }
+.gear-zoom { padding: 3px 5px; display: inline-grid; place-items: center; }

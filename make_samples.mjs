@@ -5,8 +5,8 @@
 //   node make_samples.mjs z,y,x        把這幾組還沒生成過的範例送進生成佇列（依序生成）
 //   node make_samples.mjs all          全部送進佇列
 //
-// 組別：z 景別、y 俯仰、x 方位、f 焦段、l 鏡頭、b 機身／底片。需要分鏡設計台正在執行。
-import { buildPrompt, refsOf, codeLine } from "./static/camera.js";
+// 組別：z 景別、y 俯仰、x 方位、f 焦段、l 鏡頭、b 機身、s 底片、m 修飾。需要分鏡設計台正在執行。
+import { buildPrompt, refsOf, codeLine, LENSES, BODIES, STOCKS, FOCALS, MODS } from "./static/camera.js";
 
 try { process.loadEnvFile(new URL(".env", import.meta.url)); } catch { /* 沒有 .env 就只用環境變數 */ }
 const E = process.env;
@@ -30,6 +30,8 @@ async function api(path, body) {
 const BASE = { z: "Z6", y: "Y4", x: "X2", gear: { focal: 50 } };
 const TIGHT = { ...BASE, z: "Z4" };  // 焦段／鏡頭／機身組：腰部以上，比較透視與質感
 const ACTION = `${CHAR.name_en} stands naturally in ${SCENE.name_en}, arms relaxed at the sides, calm expression.`;
+// 時間類修飾（慢動作、凝結、動態模糊）要有動作才看得出差別
+const ACTION_MOVE = `${CHAR.name_en} spins around on the path, her dress and hair swinging out with the motion.`;
 // 特寫、大特寫只描述臉部，避免「站著、雙手垂放」把畫面拉寬
 const ACTION_FACE = `${CHAR.name_en} looks calmly ahead, eyes steady, a quiet expression.`;
 
@@ -38,18 +40,35 @@ function sampleShots() {
   const add = (id, title, over, sample) => {
     const old = shots.find(s => s.id === id);
     if (old) { old.sample.push(...sample); return; }
-    shots.push({ id, title, action: ["Z1", "Z2"].includes(over.z) ? ACTION_FACE : ACTION, chars: ["C1"], subject: "C1", scene: "SC1", r: "single", m: "static", mods: [],
+    shots.push({ id, title, action: over.action || (["Z1", "Z2"].includes(over.z) ? ACTION_FACE : ACTION), chars: ["C1"], subject: "C1", scene: "SC1", r: "single", m: "static", mods: [],
       ...BASE, ...over, gear: { ...BASE.gear, ...(over.gear || {}) }, sample });
   };
   for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9]) add(n === 6 ? "BASE" : `Z${n}`, n === 6 ? "基準（Z6 Y4 X2 50mm）" : `景別 Z${n}`, { z: `Z${n}` }, [["z", `Z${n}`]]);
   for (const n of [1, 2, 3, 4, 5, 6, 7]) add(n === 4 ? "BASE" : `Y${n}`, `俯仰 Y${n}`, { y: `Y${n}`, x: n === 7 ? null : "X2" }, [["y", `Y${n}`]]);
   for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) add(n === 2 ? "BASE" : `X${n}`, `方位 X${n}`, { x: `X${n}` }, [["x", `X${n}`]]);
-  for (const mm of [14, 24, 50, 85, 135]) add(`F${mm}`, `焦段 ${mm}mm`, { ...TIGHT, gear: { focal: mm } }, [["f", String(mm)]]);
-  for (const lens of ["cooke_s4", "pana_c", "helios44", "zeiss_mp"]) add(`L_${lens}`, `鏡頭 ${lens}`, { ...TIGHT, gear: { focal: 50, lens } }, [["l", lens]]);
-  add("F50", "", {}, [["b", "arricam"]]);  // 預設設備就是 Arricam 35mm 底片＋500T
-  add("B_alexa35", "機身 Alexa 35", { ...TIGHT, gear: { focal: 50, body: "alexa35" } }, [["b", "alexa35"]]);
-  add("B_bolex", "機身 Bolex 16mm", { ...TIGHT, gear: { focal: 50, body: "bolex", stock: "v3_500t" } }, [["b", "bolex"]]);
-  add("B_doublex", "底片 Double-X 黑白", { ...TIGHT, gear: { focal: 50, stock: "doublex" } }, [["b", "doublex"]]);
+  // 焦段：都框成腰部以上，看透視差異（每個焦段都有）
+  for (const { mm } of FOCALS) add(`F${mm}`, `焦段 ${mm}mm`, { ...TIGHT, gear: { focal: mm } }, [["f", String(mm)]]);
+  // 鏡頭：50mm、同一構圖；預設的 Cooke Panchro 就是 F50；微距用大特寫才看得出來
+  add("F50", "", {}, [["l", "cooke_panchro"], ["b", "arricam"], ["s", "v3_500t_push"]]);  // 預設設備：Arricam 35mm＋Cooke Panchro＋500T 增感
+  for (const { id } of LENSES) {
+    if (id === "cooke_panchro") continue;
+    add(`L_${id}`, `鏡頭 ${id}`, id === "zeiss_macro" ? { ...TIGHT, z: "Z1", gear: { focal: 50, lens: id }, action: ACTION_FACE } : { ...TIGHT, gear: { focal: 50, lens: id } }, [["l", id]]);
+  }
+  // 機身：50mm、同一構圖（底片機身沿用預設底片）
+  for (const { id } of BODIES) {
+    if (id === "arricam") continue;
+    add(`B_${id}`, `機身 ${id}`, { ...TIGHT, gear: { focal: 50, body: id, ...(id === "bolex" ? { stock: "v3_500t" } : {}) } }, [["b", id]]);
+  }
+  // 底片：都用 Arricam 35mm 底片機身（底片型號只對底片機身有效）
+  for (const { id } of STOCKS) {
+    if (id === "v3_500t_push") continue;
+    add(id === "doublex" ? "B_doublex" : `S_${id}`, `底片 ${id}`, { ...TIGHT, gear: { focal: 50, stock: id } }, [["s", id]]);
+  }
+  // 修飾：光線、景深、時間、構圖，每個一張（時間類要有動作）
+  for (const g of MODS) for (const { id } of g.items) {
+    const timed = ["slowmo", "freeze", "blur"].includes(id);
+    add(`M_${id}`, `修飾 ${id}`, { ...TIGHT, mods: [id], ...(timed ? { action: ACTION_MOVE } : {}) }, [["m", id]]);
+  }
   return shots;
 }
 
@@ -84,7 +103,7 @@ console.log(`範例專案「${NAME}」：${p.shots.length} 顆鏡頭（${CHAR.na
 const arg = process.argv[2];
 if (!arg) { console.log("只建立分鏡，沒有生成。要生成請加組別，例如：node make_samples.mjs z,y,x"); process.exit(0); }
 
-const groups = arg === "all" ? ["z", "y", "x", "f", "l", "b"] : arg.split(",");
+const groups = arg === "all" ? ["z", "y", "x", "f", "l", "b", "s", "m"] : arg.split(",");
 const gens = await api(`/api/gens?${q}`);
 let n = 0;
 for (const s of p.shots) {

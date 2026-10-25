@@ -13,16 +13,45 @@ A local, browser-based storyboard tool for AI video: pick shots with X/Y/Z camer
 | 項目 | 用途 |
 |---|---|
 | Python 3.10 以上 | 後端 `serve.py` |
-| [Codex CLI](https://github.com/openai/codex)，並用 ChatGPT 帳號登入 | 生圖、依選項改寫畫面內容 |
-| Node.js 20.6 以上（選用） | 只有產生範例對照表 `make_samples.mjs` 需要 |
-| Windows（`start.bat`） | 其他系統直接執行 `python run.py` 也可以 |
+| Node.js 18 以上 | 安裝 Codex CLI 要用 npm；產生範例對照表需要 20.6 以上 |
+| [Codex CLI](https://github.com/openai/codex)，並用 ChatGPT 帳號登入 | 生圖、依選項改寫畫面內容（用 ChatGPT 訂閱額度，不需要 API 金鑰） |
+| Windows（`start.bat`） | macOS／Linux 直接執行 `python run.py` 也可以 |
 
-安裝 Codex：
+## 安裝
 
-```
-npm install -g @openai/codex
-codex login        # 選 Sign in with ChatGPT
-```
+1. **安裝 Python**：到 [python.org](https://www.python.org/downloads/) 下載 3.10 以上版本。Windows 安裝時要勾選「Add python.exe to PATH」。
+   確認：開命令提示字元輸入 `python --version`，看到 3.10 以上即可。
+2. **安裝 Node.js**：到 [nodejs.org](https://nodejs.org/) 下載 LTS 版本。
+   確認：`node --version`。
+3. **安裝並登入 Codex CLI**：
+   ```
+   npm install -g @openai/codex
+   codex login
+   ```
+   登入時選「Sign in with ChatGPT」，用有 ChatGPT 訂閱的帳號。確認：`codex login status` 要顯示 `Logged in using ChatGPT`。
+4. **下載本專案**（二選一）：
+   - 有裝 git：
+     ```
+     git clone https://github.com/chenisan/13soul-storyboard-studio.git
+     cd 13soul-storyboard-studio
+     ```
+   - 沒有 git：在 GitHub 頁面按「Code」→「Download ZIP」，解壓縮到任意資料夾。
+5. **建立設定檔**：把 `.env.example` 複製一份，改名為 `.env`。全部留空也能跑；要改埠號、資料位置或範例角色時再編輯，說明見下方「設定」。
+6. **啟動**：Windows 雙擊 `start.bat`；macOS／Linux 執行 `python run.py`。
+   瀏覽器會打開（或自己開）`http://127.0.0.1:8790/`，看到「分鏡設計台」頁面就成功了。
+7. **試一次生圖**：按「＋專案」建立專案 → 右上角「角色卡／場景」上傳一張角色圖 → 下方「＋」新增分鏡、勾選角色、選景別 Z 與俯仰 Y → 按「生成首幀…」→「確認生成」。約 1–2 分鐘後圖片會出現在頁面上。
+
+不需要 `pip install` 或 `npm install` 本專案的任何套件。
+
+### 常見問題
+
+| 狀況 | 處理 |
+|---|---|
+| 網頁打不開、連不到 | 確認 `start.bat` 開出的最小化視窗還在；或在本資料夾執行 `python run.py` 看錯誤訊息 |
+| 生成失敗，紀錄寫 `No authentication found` | Codex 沒登入，重新執行 `codex login` |
+| 生成失敗，紀錄寫 `Selected model is at capacity` | ChatGPT 忙碌，稍後再按一次生成 |
+| 埠號 8790 被占用 | 在 `.env` 改 `STUDIO_PORT`，例如 `8791` |
+| 改了 `.env` 沒生效 | 關掉伺服器視窗再重新啟動 |
 
 ## 設定
 

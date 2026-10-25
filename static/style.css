@@ -250,9 +250,17 @@ figure.sample.on { border-color: var(--ok); }
 .card.collapsed > .sec-bar .chev { transform: rotate(-90deg); }
 .card.collapsed > :not(.sec-bar) { display: none !important; }
 .strip-bar { width: 100%; margin: 0 0 6px; padding: 4px 2px; border: 0; border-radius: 4px; }
+/* 分鏡列滑動收合：用 grid 列高 1fr → 0fr 做平滑高度動畫 */
+footer.strip { transition: padding .28s ease; }
 footer.strip.collapsed { padding-top: 4px; padding-bottom: 4px; }
+.strip-bar { transition: margin .28s ease; }
 footer.strip.collapsed .strip-bar { margin: 0; }
-footer.strip.collapsed > :not(.strip-bar) { display: none; }
+.strip-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .28s ease, opacity .22s ease; }
+.strip-inner { min-height: 0; overflow: hidden; }
+footer.strip.collapsed .strip-body { grid-template-rows: 0fr; opacity: 0; }
+.strip-bar .chev { display: inline-block; transition: transform .28s ease; }
+footer.strip.collapsed .strip-bar .chev { transform: rotate(-90deg); }
+@media (prefers-reduced-motion: reduce) { footer.strip, .strip-bar, .strip-body, .strip-bar .chev { transition: none; } }
 @media (max-width: 700px) { .sec-sum { display: none; } }
 
 /* 漢堡選單 */

@@ -497,7 +497,7 @@ function renderStripBar() {
   const off = localGet("studio.stripCollapsed") === "1";
   document.querySelector("footer.strip").classList.toggle("collapsed", off);
   const pending = (st.project?.shots || []).reduce((n, s) => n + openNotes(s).length, 0);
-  bar.innerHTML = `<span class="chev">${off ? "▸" : "▾"}</span><b>分鏡列</b><span class="sec-sum">${st.project?.shots.length || 0} 顆${st.cur ? `｜目前 ${esc(st.cur)}` : ""}${pending ? `｜待處理備註 ${pending} 則` : ""}</span>`;
+  bar.innerHTML = `<span class="chev">▾</span><b>分鏡列</b><span class="sec-sum">${st.project?.shots.length || 0} 顆${st.cur ? `｜目前 ${esc(st.cur)}` : ""}${pending ? `｜待處理備註 ${pending} 則` : ""}</span>`;
 }
 
 // ---------------- 影片（Seedance 2.5）：預演影片、AI 撰寫提示詞、打包上傳素材 ----------------

@@ -904,7 +904,7 @@ function gearSelect(kind, list, value, defId, label) {
 function gearHtml(s) {
   const p = st.project, g = s.gear || {}, d = p.gear || {}, eff = gearOf(s, p);
   return `<div class="field" style="margin-top:8px"><span>攝影設備（留「專案預設」就跟著專案設定走）</span>
-    <span class="muted">實測：生圖模型對鏡頭品牌、數位機身、焦段的差異反應有限；黑白底片、變形鏡的橫向光斑比較明顯。滑鼠停在選項上可看範例。</span>
+    <span class="muted">實測：鏡頭品牌、數位機身、焦段、彩色底片的差異都很小；黑白底片、變形鏡的橫向光斑比較明顯。光線類修飾會被場景圖的光線蓋過，要換光線請換場景圖。放大鏡可以比較範例。</span>
     <div class="row" style="gap:10px">${gearSelect("body", BODIES, g.body, d.body, "機身")}${gearSelect("lens", LENSES, g.lens, d.lens, "鏡頭")}
     ${eff.body?.film ? gearSelect("stock", STOCKS, g.stock, d.stock, "底片") : ""}</div>
     <div class="mod-group" style="margin-top:6px"><b>焦段</b><div class="chips">${FOCALS.map(f =>

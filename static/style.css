@@ -207,3 +207,10 @@ figure.sample figcaption { font-size: 12px; margin-top: 2px; }
 .mj-ref { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; }
 .mj-ref img { width: 120px; height: 68px; object-fit: cover; border-radius: 4px; cursor: zoom-in; }
 .mj-ow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; }
+
+/* 範例格：點了套用 */
+figure.sample { position: relative; cursor: pointer; border-radius: 6px; padding: 3px; border: 2px solid transparent; }
+figure.sample:hover { border-color: var(--accent2); }
+figure.sample.on { border-color: var(--ok); }
+.sample-open { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 0, 0, .65); color: var(--text); display: grid; place-items: center; text-decoration: none; font-size: 13px; }
+.sample-open:hover { background: var(--accent); }

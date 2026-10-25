@@ -151,6 +151,13 @@ function editAsset(kind, id) {
 function openDialog(html, onAct) {
   const dlg = $("#dlg"), form = $("#dlgBody");
   form.innerHTML = html;
+  let dirty = false;
+  form.oninput = () => { dirty = true; };
+  dlg.onclick = e => {
+    if (e.target !== dlg) return;  // dialog 本身沒有內距，點到它就是點到外面的遮罩
+    if (dirty) { toast("視窗裡有修改還沒存，請按「取消」或「儲存」"); return; }
+    dlg.close();
+  };
   form.onclick = async e => {
     const b = e.target.closest("[data-act]");
     if (!b) return;
@@ -505,15 +512,42 @@ document.addEventListener("mousemove", e => {
 });
 
 function samplesHtml() {
+  const s = shot();
   const card = ([val, label], axis) => {
     const smp = st.samples[`${axis}:${val}`];
-    const ph = smp?.file ? `<a href="${sampleUrl(smp.file)}" target="_blank"><img src="${sampleUrl(smp.file)}"></a>`
+    const ph = smp?.file ? `<img src="${sampleUrl(smp.file)}"><a class="sample-open" href="${sampleUrl(smp.file)}" target="_blank" title="開原圖">↗</a>`
       : `<div class="ph">${smp?.status === "running" ? '<span class="spin tiny"></span> 生成中' : smp?.status === "queued" ? "排隊中" : smp?.status === "failed" ? "生成失敗" : "尚未生成"}</div>`;
-    return `<figure class="sample">${ph}<figcaption>${esc(label)}</figcaption></figure>`;
+    const on = s && sampleSelected(s, axis, val);
+    return `<figure class="sample ${on ? "on" : ""}" data-apply="${axis}:${esc(val)}" title="${s ? `套用到 ${esc(s.id)}` : ""}">${ph}<figcaption>${esc(label)}${on ? '　<span class="badge ok">目前</span>' : ""}</figcaption></figure>`;
   };
   const done = Object.values(st.samples).filter(x => x.file).length;
-  return `<div class="muted">同一個角色、同一個場景，每組只改一個變數（已完成 ${done} 格，開著會自動更新；點圖看原尺寸）。重新產生：<code>node make_samples.mjs all</code></div>
+  return `<div class="muted">${s ? `點一張圖就把那個設定套用到 <b>${esc(s.id)}</b>，提示詞會跟著改；框起來的是 ${esc(s.id)} 目前的設定。` : "先選一顆分鏡，點圖就能套用設定。"}
+    同一個角色、同一個場景，每組只改一個變數（已完成 ${done} 格）。右上角 ↗ 開原圖。重新產生：<code>node make_samples.mjs all</code></div>
     ${SAMPLE_GROUPS.map(g => `<h4>${esc(g.title)}</h4><div class="sample-grid">${g.items.map(it => card(it, g.axis)).join("")}</div>`).join("")}`;
+}
+
+// 範例格與分鏡設定的對應（機身組同時決定底片）
+const SAMPLE_BODY = { arricam: { body: "arricam", stock: "v3_500t_push" }, alexa35: { body: "alexa35", stock: null },
+  bolex: { body: "bolex", stock: "v3_500t" }, doublex: { body: "arricam", stock: "doublex" } };
+function sampleSelected(s, axis, val) {
+  const g = gearOf(s, st.project);
+  if (axis === "z" || axis === "y" || axis === "x") return s[axis] === val;
+  if (axis === "f") return g.focal === +val;
+  if (axis === "l") return g.lens?.id === val;
+  const b = SAMPLE_BODY[val];
+  return b && g.body?.id === b.body && (g.stock?.id || null) === b.stock;
+}
+function applySample(axis, val) {
+  const s = shot();
+  if (!s) return toast("先選一顆分鏡");
+  s.gear ??= {};
+  if (axis === "z" || axis === "y" || axis === "x") s[axis] = val;
+  else if (axis === "f") s.gear.focal = +val;
+  else if (axis === "l") s.gear.lens = val;
+  else if (axis === "b") for (const [k, v] of Object.entries(SAMPLE_BODY[val])) { if (v) s.gear[k] = v; else delete s.gear[k]; }
+  save(); renderEditor(); renderStrip();
+  const label = SAMPLE_GROUPS.find(g => g.axis === axis)?.items.find(([v]) => v === val)?.[1] || val;
+  toast(`已套用「${label}」到 ${s.id}，提示詞已更新`);
 }
 
 function openSamples() {
@@ -1171,6 +1205,15 @@ $("#newProject").onclick = async () => {
 };
 $("#projectSettings").onclick = projectSettings;
 $("#sampleBtn").onclick = async () => { await loadSamples(); openSamples(); };
+// 範例格點一下就套用（↗ 開原圖除外）
+$("#dlg").addEventListener("click", e => {
+  if (e.target.closest(".sample-open")) return;
+  const card = e.target.closest("[data-apply]");
+  if (!card) return;
+  const [axis, ...rest] = card.dataset.apply.split(":");
+  applySample(axis, rest.join(":"));
+  $("#dlg").close();
+});
 
 // 角色卡／場景面板
 const assetPanel = $("#assetPanel");

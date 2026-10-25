@@ -7,12 +7,16 @@
 //   node studio.mjs export <專案> [輸出檔.json]        把專案輸出成計畫檔格式（可改完再 import --replace）
 //   node studio.mjs gen <專案> <S01,S02|all> [--missing] [--yes]   沒加 --yes 只列出、不送出
 //   node studio.mjs status
+//   node studio.mjs show <專案> <S01>                 一顆分鏡的完整狀態與所有提示詞
+//   node studio.mjs set <專案> <S01> 欄位=值 …         例：z=Z3 action="她回頭" mods=逆光剪影,大光圈虛化
+//   node studio.mjs previs <專案> <S01> <影片路徑> [--note "說明"]
+//   node studio.mjs seedance <專案> <S01> [--request "需求"] [--duration 5] [--engine codex|claude] [--pack]
 //
 // 計畫檔格式見 examples/plan_example.json 與 README「指令工具」。
 import fs from "node:fs";
 import path from "node:path";
 import { X, Y, Z, R, M, MODS, BODIES, LENSES, STOCKS, FOCALS, EN_LOOK, EN_RULES, ZH_LOOK, ZH_RULES,
-  buildPrompt, refsOf, codeLine, checkShot, checkPair } from "./static/camera.js";
+  buildPrompt, refsOf, codeLine, checkShot, checkPair, seedanceUploads, seedanceContext } from "./static/camera.js";
 
 try { process.loadEnvFile(new URL(".env", import.meta.url)); } catch { /* 沒有 .env */ }
 const API = `http://127.0.0.1:${process.env.STUDIO_PORT || 8790}`;
@@ -34,7 +38,8 @@ const qp = name => `p=${encodeURIComponent(name)}`;
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const flags = new Set(process.argv.filter(a => a.startsWith("--")));
 const opt = k => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : undefined; };
-const args = process.argv.slice(2).filter((a, i, all) => !a.startsWith("--") && !(i > 0 && ["--ratio", "--lang"].includes(all[i - 1])));
+const VALUE_OPTS = ["--ratio", "--lang", "--note", "--request", "--duration", "--engine"];  // 後面接值的選項
+const args = process.argv.slice(2).filter((a, i, all) => !a.startsWith("--") && !(i > 0 && VALUE_OPTS.includes(all[i - 1])));
 
 async function loadProject(name) {
   const p = await api(`/api/project?${qp(name)}`);
@@ -266,7 +271,108 @@ async function cmdStatus() {
   console.log(`排隊：${wait.length} 張${wait.length ? "（" + wait.map(j => `${j.project}/${j.shot_id}`).join("、") + "）" : ""}`);
 }
 
-const cmds = { new: cmdNew, import: cmdImport, list: cmdList, export: cmdExport, gen: cmdGen, status: cmdStatus };
+// ---------------- 單顆分鏡：看、改、預演、Seedance ----------------
+async function shotOf(name, id) {
+  if (!name || !id) throw new Error("需要專案名稱與分鏡代號，例如：show 我的專案 S01");
+  const p = await loadProject(name);
+  const s = p.shots.find(x => x.id === id);
+  if (!s) throw new Error(`專案「${name}」沒有分鏡 ${id}（現有：${p.shots.map(x => x.id).join("、")}）`);
+  return { p, s };
+}
+
+async function cmdShow([name, id]) {
+  const { p, s } = await shotOf(name, id);
+  const g = (await api(`/api/gens?${qp(name)}`))[id];
+  const cur = g?.versions?.find(v => v.v === g.current);
+  const cName = cid => p.characters.find(c => c.id === cid)?.name || cid;
+  console.log(`${s.id}　${s.title || ""}\n鏡頭：${codeLine(s, p)}`);
+  console.log(`角色：${(s.chars || []).map(cName).join("、") || "（無）"}　主體：${cName(s.subject) || "（無）"}　場景：${p.scenes.find(x => x.id === s.scene)?.name || "（無）"}`);
+  console.log(`畫面內容：${s.action || "（空）"}`);
+  console.log(`現行首幀：${cur ? `v${cur.v}（${{ approved: "核可", rejected: "退回", check: "需核對" }[cur.review] || "待核"}）${cur.file}` : "（還沒生成）"}`);
+  if (s.previs?.path) console.log(`預演影片：${s.previs.path}${s.previs.note ? `（${s.previs.note}）` : ""}`);
+  for (const w of checkShot(s, p).filter(w => w.level !== "info")) console.log(`${w.level === "error" ? "✖" : "⚠"} ${w.msg}`);
+  console.log(`\n── 首幀提示詞${s.manual?.still ? "（手改版）" : ""} ──\n${s.manual?.still?.text ?? buildPrompt(s, p, "still").en}`);
+  console.log(`\n── 影片提示詞（依選項自動組）──\n${buildPrompt(s, p, "video").en}`);
+  const { items } = seedanceUploads(s, p, g);
+  console.log(`\n── Seedance 上傳清單 ──\n${items.map(i => i.use ? `${i.label}　${i.name}　${i.role}` : `（不上傳）${i.role}`).join("\n") || "（還沒有首幀）"}`);
+  if (s.seedance?.prompt) console.log(`\n── Seedance 2.5 提示詞（${s.seedance.engine === "claude" ? "Claude Code" : "codex"} 撰寫）──\n需求：${s.seedance.request || "（無）"}\n${s.seedance.prompt}`);
+}
+
+// set 可以改的欄位；值的寫法和計畫檔相同（名稱或代號都可以）
+async function cmdSet([name, id, ...pairs]) {
+  const { p, s } = await shotOf(name, id);
+  if (!pairs.length) throw new Error("用法：set <專案> <S01> 欄位=值 …（欄位：title action z y x r m mods chars subject scene focal lens body stock request duration engine）");
+  const byName = (list, v, label, keys = ["id", "zh"]) => { const hit = findBy(list, v, keys); if (!hit) throw new Error(`${label}「${v}」不存在`); return hit.id; };
+  const charId = n => { const c = p.characters.find(c => c.name === n || c.id === n); if (!c) throw new Error(`角色「${n}」不存在`); return c.id; };
+  const changes = [];
+  for (const pair of pairs) {
+    const i = pair.indexOf("="); if (i < 1) throw new Error(`看不懂「${pair}」，要寫成 欄位=值`);
+    const k = pair.slice(0, i), v = pair.slice(i + 1).trim();
+    s.gear ??= {}; s.seedance ??= {};
+    switch (k) {
+      case "title": case "action": s[k] = v; break;
+      case "z": s.z = byName(Z, v, "景別"); break;
+      case "y": s.y = byName(Y, v, "俯仰"); break;
+      case "x": s.x = v ? byName(X, v, "方位") : null; break;
+      case "r": s.r = byName(R, v, "人物關係"); break;
+      case "m": s.m = byName(M, v, "運鏡"); break;
+      case "mods": s.mods = v ? v.split(",").map(x => byName(MOD_LIST, x.trim(), "修飾")) : []; break;
+      case "chars": s.chars = v ? v.split(",").map(x => charId(x.trim())) : []; if (!s.chars.includes(s.subject)) s.subject = s.chars[0] || null; break;
+      case "subject": s.subject = charId(v); break;
+      case "scene": { const sc = p.scenes.find(x => x.name === v || x.id === v); if (!sc && v) throw new Error(`場景「${v}」不存在`); s.scene = sc?.id || null; break; }
+      case "focal": if (v && !FOCALS.some(f => f.mm === +v)) throw new Error(`焦段只能是 ${FOCALS.map(f => f.mm).join("／")}`); if (v) s.gear.focal = +v; else delete s.gear.focal; break;
+      case "lens": case "body": case "stock": { const list = { lens: LENSES, body: BODIES, stock: STOCKS }[k]; if (v) s.gear[k] = byName(list, v, k, ["id", "name"]); else delete s.gear[k]; break; }
+      case "request": s.seedance.request = v; break;
+      case "duration": s.seedance.duration = Math.min(15, Math.max(4, +v || 5)); break;
+      case "engine": if (!["codex", "claude"].includes(v)) throw new Error("engine 只能是 codex 或 claude"); s.seedance.engine = v; break;
+      default: throw new Error(`不能用 set 改「${k}」`);
+    }
+    changes.push(k);
+  }
+  await saveProject(name, p);
+  console.log(`已更新 ${id}：${changes.join("、")}\n鏡頭：${codeLine(s, p)}`);
+  for (const w of checkShot(s, p).filter(w => w.level !== "info")) console.log(`${w.level === "error" ? "✖" : "⚠"} ${w.msg}`);
+  if (s.manual?.still) console.log("注意：這顆的首幀提示詞在網頁上手改過，改選項不會自動更新它（網頁上可以「還原成自動版」）。");
+}
+
+async function cmdPrevis([name, id, file]) {
+  const { p, s } = await shotOf(name, id);
+  if (!file) throw new Error("用法：previs <專案> <S01> <影片路徑> [--note 說明]");
+  const { path: rel } = await api(`/api/import_path?${qp(name)}`, { kind: "previs", path: path.resolve(file) });
+  s.previs = { path: rel, note: opt("--note") ?? s.previs?.note ?? "" };
+  await saveProject(name, p);
+  console.log(`已掛上預演影片：${rel}`);
+}
+
+async function cmdSeedance([name, id]) {
+  const { p, s } = await shotOf(name, id);
+  s.seedance ??= {};
+  const sd = s.seedance;
+  if (opt("--request") !== undefined) sd.request = opt("--request");
+  if (opt("--duration") !== undefined) sd.duration = Math.min(15, Math.max(4, +opt("--duration") || 5));
+  if (opt("--engine") !== undefined) sd.engine = opt("--engine");
+  const g = (await api(`/api/gens?${qp(name)}`))[id];
+  const { items, frameVer } = seedanceUploads(s, p, g);
+  if (!frameVer) throw new Error(`${id} 還沒有首幀，先生成並設為現行版`);
+  const ups = items.filter(i => i.use);
+  console.log(`撰寫中（${sd.engine === "claude" ? "Claude Code" : "codex"}，約 30–90 秒）…`);
+  const { text } = await api(`/api/seedance_prompt?${qp(name)}`, { shot_id: id, engine: sd.engine || "codex", request: sd.request || "",
+    duration: sd.duration || 5, frame: frameVer.file, context: seedanceContext(s, p), uploads: ups.map(({ label, name: n, role }) => ({ label, name: n, role })) });
+  // 寫回前重新讀一次，避免撰寫期間網頁剛改過造成版本衝突
+  const fresh = await loadProject(name), fs2 = fresh.shots.find(x => x.id === id);
+  fs2.seedance = { ...(fs2.seedance || {}), request: sd.request || "", duration: sd.duration || 5, engine: sd.engine || "codex", prompt: text,
+    history: [{ text, engine: sd.engine || "codex", request: sd.request || "", duration: sd.duration || 5, frame: `v${frameVer.v}`,
+      created: new Date().toLocaleString("zh-TW", { hour12: false }) }, ...((fs2.seedance || {}).history || [])].slice(0, 20) };
+  await saveProject(name, fresh);
+  console.log(`\n上傳清單：\n${ups.map(i => `  ${i.label}　${i.name}　${i.role}`).join("\n")}\n\n${text}`);
+  if (flags.has("--pack")) {
+    const { dir, files } = await api(`/api/seedance_pack?${qp(name)}`, { shot_id: id, prompt: text, uploads: ups.map(({ path: pth, name: n }) => ({ path: pth, name: n })) });
+    console.log(`\n已打包到專案的 ${dir}/：${files.join("、")}`);
+  }
+}
+
+const cmds = { new: cmdNew, import: cmdImport, list: cmdList, export: cmdExport, gen: cmdGen, status: cmdStatus,
+  show: cmdShow, set: cmdSet, previs: cmdPrevis, seedance: cmdSeedance };
 const [cmd, ...rest] = args;
 if (!cmds[cmd]) {
   const lines = fs.readFileSync(new URL(import.meta.url), "utf8").split("\n");

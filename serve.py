@@ -39,9 +39,15 @@ STATIC = ROOT / "static"
 PROJECTS = env_path("STUDIO_PROJECTS_DIR", ROOT / "projects")
 GEN_PY = env_path("CODEX_IMAGE_GEN", ROOT / "tools" / "codex_image_gen.py")
 IMG_EXT = {".png", ".jpg", ".jpeg", ".webp"}
-KINDS = ("characters", "scenes", "refs")  # 可以上傳／匯入的資料夾
+VIDEO_EXT = {".mp4", ".webm", ".mov", ".m4v"}
+KINDS = ("characters", "scenes", "refs", "previs")  # 可以上傳／匯入的資料夾（previs 放預演影片）
 MIME = {".js": "application/javascript", ".css": "text/css", ".html": "text/html", ".json": "application/json",
-        ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".log": "text/plain"}
+        ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".log": "text/plain",
+        ".mp4": "video/mp4", ".m4v": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime", ".txt": "text/plain"}
+
+
+def allowed_ext(kind: str) -> set[str]:
+    return VIDEO_EXT if kind == "previs" else IMG_EXT
 
 lock = threading.RLock()
 jobs: "queue.Queue[dict]" = queue.Queue()
@@ -204,6 +210,8 @@ Rules:
 
 
 def codex_exe() -> str:
+    if os.environ.get("CODEX_BIN"):  # 測試時換成假的 codex
+        return os.environ["CODEX_BIN"]
     exe = shutil.which("codex")
     if exe:
         return exe
@@ -281,6 +289,89 @@ def import_version(p: str, body: dict) -> dict:
     return {"v": v, "file": rel}
 
 
+# ---------------- Seedance 2.5 提示詞（codex 或 Claude Code 撰寫，唯讀） ----------------
+SEEDANCE_GUIDE = env_path("SEEDANCE_GUIDE", ROOT / "docs" / "seedance25_guide.md")
+
+SEEDANCE_TASK = """你是 Seedance 2.5 影片提示詞的撰寫者。請依下列資料，用繁體中文寫一段可以直接貼進 Seedance 2.5 的提示詞。
+不要使用任何工具修改檔案；{look}
+
+規則：
+- 參考素材只能用「上傳清單」裡的編號引用（例如 圖片1、影片1），不要提到清單以外的素材。
+- 圖片1 是這顆鏡頭的首幀：影片從這個畫面開始，構圖、人物位置、服裝、光線都以它為準，不要寫和它衝突的內容。
+- 依時間段寫動作（總長 {duration} 秒），每段寫主體動作、表情變化、鏡頭運動，最後寫結束狀態。
+- 有預演影片時，說明它只提供走位、節奏與攝影機方向。
+- 最後列【禁止】。
+- 只輸出提示詞本文：不要前言、不要解釋、不要用 markdown 程式碼框。
+
+【Seedance 寫作守則】
+{guide}
+
+【這顆鏡頭的資料】
+{context}
+
+【上傳清單（照這個順序上傳）】
+{uploads}
+
+【使用者的需求】
+{request}
+"""
+
+
+def claude_exe() -> str:
+    if os.environ.get("CLAUDE_BIN"):  # 測試時換成假的 claude
+        return os.environ["CLAUDE_BIN"]
+    return shutil.which("claude") or str(Path.home() / ".local" / "bin" / "claude.exe")
+
+
+def seedance_prompt(p: str, body: dict) -> str:
+    pdir = project_dir(p)
+    frame = inside(pdir, body.get("frame", ""))
+    if not frame or not frame.is_file():
+        raise ValueError("找不到首幀圖，請先生成並設為現行版")
+    guide = SEEDANCE_GUIDE.read_text(encoding="utf-8")[:16000] if SEEDANCE_GUIDE.is_file() else ""
+    uploads = "\n".join(f"{u['label']}：{u['name']}（{u['role']}）" for u in body.get("uploads", []))
+    engine = body.get("engine", "codex")
+    look = "首幀圖已附上，請先看過再寫。" if engine == "codex" else f"請先用 Read 工具看首幀圖：{frame}"
+    text = SEEDANCE_TASK.format(look=look, duration=body.get("duration", 5), guide=guide,
+                                context=json.dumps(body.get("context", {}), ensure_ascii=False, indent=1),
+                                uploads=uploads or "（只有圖片1 首幀）", request=(body.get("request") or "").strip() or "（使用者沒有額外需求，依鏡頭資料寫）")
+    with tempfile.TemporaryDirectory() as tmp:  # 在空資料夾執行，碰不到專案檔案
+        if engine == "claude":
+            cmd = [claude_exe(), "-p", "--model", "sonnet", "--allowedTools", "Read", "--add-dir", str(frame.parent)]
+            r = subprocess.run(cmd, input=text, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, cwd=tmp)
+            out = (r.stdout or "").strip()
+        else:
+            out_file = Path(tmp) / "out.txt"
+            cmd = [codex_exe(), "exec", "--skip-git-repo-check", "--ephemeral", "--sandbox", "read-only",
+                   "-c", 'model_reasoning_effort="medium"', "-i", str(frame), "-o", str(out_file), "-"]
+            r = subprocess.run(cmd, input=text, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, cwd=tmp)
+            out = out_file.read_text(encoding="utf-8", errors="replace").strip() if out_file.exists() else ""
+    if not out:
+        tail = (r.stderr or r.stdout or "").strip().splitlines()[-3:]
+        raise RuntimeError(f"{'Claude Code' if engine == 'claude' else 'codex'} 沒有回傳內容：" + " / ".join(tail))
+    return re.sub(r"^```[a-z]*\n|\n```$", "", out).strip()  # 萬一包了程式碼框
+
+
+def seedance_pack(p: str, body: dict) -> dict:
+    """照上傳清單的編號重新命名、放進 seedance/<分鏡>/，附 prompt.txt"""
+    pdir = project_dir(p)
+    sid = safe_name(body["shot_id"])
+    out = pdir / "seedance" / sid
+    if out.exists():
+        shutil.rmtree(out)  # 只清這顆分鏡上次打包的輸出
+    out.mkdir(parents=True)
+    names = []
+    for u in body.get("uploads", []):
+        src = inside(pdir, u.get("path", ""))
+        if not src or not src.is_file():
+            raise ValueError(f"找不到素材：{u.get('path')}")
+        name = safe_name(u["name"]) + src.suffix.lower()
+        shutil.copy2(src, out / name)
+        names.append(name)
+    (out / "prompt.txt").write_text(body.get("prompt", ""), encoding="utf-8")
+    return {"dir": f"seedance/{sid}", "files": names + ["prompt.txt"]}
+
+
 def enqueue(p: str, body: dict) -> dict:
     sid = body["shot_id"]
     pdir = project_dir(p)
@@ -327,8 +418,27 @@ class Handler(BaseHTTPRequestHandler):
         ctype = MIME.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype in ("application/javascript", "application/json"):
             ctype += "; charset=utf-8"
-        data = path.read_bytes()
-        self.send_response(200)
+        size = path.stat().st_size
+        m = re.match(r"bytes=(\d*)-(\d*)$", self.headers.get("Range", ""))
+        if m and size and (m.group(1) or m.group(2)):  # 影片拖動進度條需要分段讀取
+            if m.group(1):
+                start, end = int(m.group(1)), min(int(m.group(2) or size - 1), size - 1)
+            else:
+                start, end = max(size - int(m.group(2)), 0), size - 1
+            if start > end:
+                self.send_response(416)
+                self.send_header("Content-Range", f"bytes */{size}")
+                self.end_headers()
+                return
+            with open(path, "rb") as fh:
+                fh.seek(start)
+                data = fh.read(end - start + 1)
+            self.send_response(206)
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        else:
+            data = path.read_bytes()
+            self.send_response(200)
+        self.send_header("Accept-Ranges", "bytes")
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
@@ -438,8 +548,8 @@ class Handler(BaseHTTPRequestHandler):
                 if kind not in KINDS:
                     return self.send_json({"error": "kind"}, 400)
                 name = safe_name(q["name"])
-                if Path(name).suffix.lower() not in IMG_EXT:
-                    return self.send_json({"error": "只接受 png／jpg／webp"}, 400)
+                if Path(name).suffix.lower() not in allowed_ext(kind):
+                    return self.send_json({"error": "預演影片只接受 mp4／webm／mov" if kind == "previs" else "只接受 png／jpg／webp"}, 400)
                 dst = unique_path(project_dir(q["p"]) / kind, name)
                 dst.write_bytes(self.body())
                 return self.send_json({"path": f"{kind}/{dst.name}"})
@@ -454,8 +564,8 @@ class Handler(BaseHTTPRequestHandler):
                         return self.send_json({"error": "bad path"}, 403)
                 else:
                     src = Path(b["path"].strip().strip('"'))
-                if not src.is_file() or src.suffix.lower() not in IMG_EXT:
-                    return self.send_json({"error": f"找不到圖片：{src}"}, 400)
+                if not src.is_file() or src.suffix.lower() not in allowed_ext(b["kind"]):
+                    return self.send_json({"error": f"找不到{'影片' if b['kind'] == 'previs' else '圖片'}：{src}"}, 400)
                 dst = unique_path(pdir / b["kind"], src.name)
                 shutil.copy2(src, dst)
                 return self.send_json({"path": f"{b['kind']}/{dst.name}"})
@@ -485,6 +595,18 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json({"error": "只支援 Windows"}, 400)
                 subprocess.Popen(["explorer", "/select,", str(f)])
                 return self.send_json({"ok": True})
+            if path == "/api/seedance_prompt":  # AI 撰寫 Seedance 2.5 提示詞（30–90 秒）
+                try:
+                    return self.send_json({"text": seedance_prompt(q["p"], json.loads(self.body()))})
+                except subprocess.TimeoutExpired:
+                    return self.send_json({"error": "超過 5 分鐘沒有回應"}, 504)
+                except (ValueError, RuntimeError, OSError) as e:
+                    return self.send_json({"error": str(e)}, 400)
+            if path == "/api/seedance_pack":  # 打包上傳素材
+                try:
+                    return self.send_json(seedance_pack(q["p"], json.loads(self.body())))
+                except (ValueError, OSError) as e:
+                    return self.send_json({"error": str(e)}, 400)
             if path == "/api/generate":
                 if not GEN_PY.exists():
                     return self.send_json({"error": f"找不到 {GEN_PY}"}, 500)

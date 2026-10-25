@@ -216,3 +216,17 @@ figure.sample:hover { border-color: var(--accent2); }
 figure.sample.on { border-color: var(--ok); }
 .sample-open { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 0, 0, .65); color: var(--text); display: grid; place-items: center; text-decoration: none; font-size: 13px; }
 .sample-open:hover { background: var(--accent); }
+
+/* Seedance 2.5 卡片 */
+.sd-grid { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.3fr); gap: 14px; }
+@media (max-width: 900px) { .sd-grid { grid-template-columns: 1fr; } }
+.sd-video { width: 100%; max-height: 260px; background: #000; border-radius: 6px; }
+.sd-ups { display: grid; gap: 6px; }
+.sd-up { display: flex; gap: 8px; align-items: center; font-size: 12px; background: var(--panel2); border-radius: 6px; padding: 4px 6px; cursor: pointer; }
+.sd-up img, .sd-vid { width: 72px; height: 44px; object-fit: cover; border-radius: 4px; flex: none; }
+.sd-vid { display: grid; place-items: center; background: #0b0c0d; color: var(--accent2); }
+.sd-up.off { opacity: .5; }
+.sd-hist { margin-top: 8px; font-size: 12px; }
+.sd-h { display: flex; gap: 8px; align-items: center; padding: 2px 0; }
+.th-tag { position: absolute; left: 4px; top: 4px; font-size: 10px; background: rgba(0, 0, 0, .7); color: var(--accent2); padding: 1px 5px; border-radius: 3px; }
+.th-tag.sd { left: auto; right: 4px; color: var(--info); }

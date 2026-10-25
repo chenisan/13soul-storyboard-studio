@@ -148,6 +148,10 @@ node studio.mjs list <專案>
 node studio.mjs export <專案> [輸出檔.json]
 node studio.mjs gen <專案> <S01,S02|all> [--missing] [--yes]
 node studio.mjs status
+node studio.mjs show <專案> <S01>
+node studio.mjs set <專案> <S01> 欄位=值 …
+node studio.mjs previs <專案> <S01> <影片路徑> [--note 說明]
+node studio.mjs seedance <專案> <S01> [--request 需求] [--duration 5] [--engine codex|claude] [--pack]
 ```
 
 - **分鏡計畫檔**：JSON，寫專案、角色（名稱、角色卡圖片、鎖定描述）、場景、每顆分鏡（景別 z、俯仰 y、方位 x、關係 r、運鏡 m、修飾、焦段、畫面內容）。範例見 `examples/plan_example.json`。角色、場景、修飾、鏡頭都可以用名稱寫，例如修飾寫「輪廓光」。圖片路徑以計畫檔所在資料夾為準。
@@ -157,6 +161,9 @@ node studio.mjs status
   - 分鏡預設加在後面，`--replace` 整份取代；分鏡寫了 `id` 就更新那一顆。
   - 新分鏡的代號會接在用過的最大號碼後面，不會和舊版本的圖混在一起。
 - **export → 修改 → import --replace**：用指令大改既有專案。
+- **show**：一顆分鏡的完整狀態（現行首幀、預演、警告、首幀／影片／Seedance 提示詞、上傳清單）。
+- **set**：改單顆分鏡的欄位，例如 `z=Z3 action="她回頭" mods=逆光剪影,大光圈虛化 focal=85`。網頁開著會自動重新載入。
+- **previs**、**seedance**：掛預演影片、撰寫 Seedance 提示詞（`--pack` 順便打包上傳素材）。結果寫回分鏡，網頁上看得到。
 - **gen**：沒加 `--yes` 只列出會生成哪些、需要多久，不會送出。`--missing` 只生還沒有圖的。有紅色錯誤的分鏡會略過。網頁上手改過的提示詞優先使用。
 - 網頁開著同一個專案時，匯入後 10 秒內會自動重新載入。專案存檔有版本號，網頁和指令同時修改時，後到的會被拒絕，不會互相覆蓋。
 
@@ -173,6 +180,19 @@ node studio.mjs status
 - 切換語言時，質感與禁止事項如果還是預設文字，會換成該語言的預設；自己改過的不動。
 
 實測：同一組最難的鏡頭（大特寫、蟲視、背面、大遠景），逐句對應的中文版和英文版效果相當，見踩坑記錄。
+
+## 預演影片與 Seedance 2.5 提示詞
+
+每顆分鏡下方有「影片（Seedance 2.5）」卡片：
+
+1. **預演影片**（選填）：拖曳、選檔或貼路徑，複製到專案的 `previs/`，可以直接播放、拖動進度，並寫一句說明。給 Seedance 2.5 的預演最好是方塊或模糊色塊，像真人的人偶會被整段照抄。
+2. **上傳清單**：圖片1 固定是現行首幀；角色卡預設勾選；場景、額外參考圖預設不勾（參考素材越少越好）；預演是影片1。勾選後編號會自動重排。
+3. **需求**：用中文寫這顆要怎麼動、怎麼演，選時長（4–15 秒）和撰寫引擎（codex 或 Claude Code），按「產生 Seedance 提示詞」，約 30–90 秒。
+   - AI 會看到首幀圖、鏡頭資料、角色、預演說明、上傳清單編號，以及 Seedance 寫作守則（`docs/seedance25_guide.md`，可用 `.env` 的 `SEEDANCE_GUIDE` 換成自己的）。
+   - 兩種引擎都以唯讀方式、在暫存資料夾執行。
+4. 結果可以修改，每次產生都保留歷史。按「**打包上傳素材**」，會照編號複製成 `image_01_首幀.png`、`image_02_角色卡_….png`、`video_01_預演.mp4` 和 `prompt.txt`，放在專案的 `seedance/<分鏡>/` 並開啟資料夾，照順序拖進 Seedance 就好。
+
+指令也能做同樣的事（見「指令工具」的 `previs`、`seedance`）。
 
 ## Midjourney（半自動）
 

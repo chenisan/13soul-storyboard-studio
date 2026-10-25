@@ -574,3 +574,39 @@ export function wordDiff(a, b) {
   while (j < m) push("add", B[j++]);
   return out;
 }
+
+// ---------------- Seedance 2.5 上傳清單（網頁與 studio.mjs 共用） ----------------
+// 上傳清單：圖片1 固定是首幀；角色卡預設勾選；場景、額外參考圖預設不勾（Seedance 參考圖越少越好）
+export function seedanceUploads(s, p, g) {
+  const cur = g?.versions.find(v => v.v === g.current && v.file);
+  const items = [];
+  if (cur) items.push({ key: "frame", path: cur.file, kind: "image", base: "首幀", role: "首幀（影片從這個畫面開始）", def: true, fixed: true });
+  for (const r of refsOf(s, p)) {
+    const scene = r.label.startsWith("location"), extra = r.kind === "extra";
+    const nm = r.labelZh.replace(/ (角色卡|場景)$/, "");
+    items.push({ key: r.key, path: r.path, kind: "image", def: !scene && !extra,
+      base: scene ? `場景_${nm}` : extra ? "參考" : `角色卡_${nm}`,
+      role: scene ? "場景參考（首幀已有場景時通常不需要）" : extra ? `參考：${r.labelZh}` : "角色卡（只鎖定外觀）" });
+  }
+  if (s.previs?.path) items.push({ key: "previs", path: s.previs.path, kind: "video", base: "預演", role: "預演（只取走位、節奏與攝影機方向）", def: true });
+  const on = new Set(s.seedance?.on || []), off = new Set(s.seedance?.off || []);
+  let ni = 0, nv = 0;
+  for (const it of items) {
+    it.use = it.fixed || (on.has(it.key) ? true : off.has(it.key) ? false : it.def);
+    if (!it.use) continue;
+    if (it.kind === "image") { ni++; it.label = `圖片${ni}`; it.name = `image_${String(ni).padStart(2, "0")}_${it.base}`; }
+    else { nv++; it.label = `影片${nv}`; it.name = `video_${String(nv).padStart(2, "0")}_${it.base}`; }
+  }
+  return { items, frameVer: cur };
+}
+
+export function seedanceContext(s, p) {
+  const sc = p.scenes.find(x => x.id === s.scene);
+  return {
+    title: s.title || "", camera_code: codeLine(s, p), action: s.action || "",
+    video_prompt_draft: buildPrompt(s, p, "video").en,  // 網頁依選項組出的影片提示詞，當成參考
+    characters: (s.chars || []).map(id => { const c = p.characters.find(c => c.id === id); return c && { name: c.name, lock: c.lock, outfit: c.outfit }; }).filter(Boolean),
+    scene: sc ? { name: sc.name, desc: sc.desc } : null,
+    previs: s.previs ? { note: s.previs.note || "" } : null,
+  };
+}

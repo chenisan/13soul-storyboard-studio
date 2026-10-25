@@ -1,4 +1,4 @@
-import { BODIES, LENSES, FOCALS, STOCKS, gearOf, migrateShotGear, midjourneyRefs, EN_LOOK, EN_RULES, ZH_LOOK, ZH_RULES } from "./camera.js";
+import { BODIES, LENSES, FOCALS, STOCKS, gearOf, migrateShotGear, midjourneyRefs, EN_LOOK, EN_RULES, ZH_LOOK, ZH_RULES, seedanceUploads, seedanceContext } from "./camera.js";
 import { X, Y, Z, R, M, MODS, zOf, rOf, codeLine, checkShot, checkPair, buildPrompt, refsOf, wordDiff, charNameEn } from "./camera.js";
 import { Stage, POSES, colorOf, colorName } from "./stage3d.js";
 import { checkPair3d, DEFAULT_HEIGHT } from "./stagemath.js";
@@ -349,11 +349,107 @@ function renderEditor() {
   </div>
 
   <div class="card"><div class="tabs"><h3 style="margin:0">生成版本</h3><span class="grow"></span><span id="verTools"></span></div>
-    <div class="versions" id="versions"></div></div>`;
+    <div class="versions" id="versions"></div></div>
+
+  <div class="card" id="sdCard"></div>`;
   refreshDerived();
   renderVersions();
+  renderSeedance(s);
   if (st.view === "3d") mountStage();
   renderRewrite();
+}
+
+// ---------------- 影片（Seedance 2.5）：預演影片、AI 撰寫提示詞、打包上傳素材 ----------------
+// 上傳清單與給 AI 的資料在 camera.js（網頁與指令工具共用）
+const sdUploads = s => seedanceUploads(s, st.project, st.gens[s.id]);
+const sdContext = s => seedanceContext(s, st.project);
+
+function renderSeedance(s) {
+  const box = $("#sdCard"); if (!box || !s) return;
+  const sd = s.seedance || {};
+  const { items, frameVer } = sdUploads(s);
+  const busy = st.sdBusy === s.id;
+  const hist = sd.history || [];
+  box.innerHTML = `<div class="tabs"><h3 style="margin:0">影片（Seedance 2.5）</h3></div>
+    <div class="sd-grid">
+      <div class="field"><span>預演影片（選填）</span>
+        ${s.previs?.path ? `<video class="sd-video" controls preload="metadata" src="${fileUrl(s.previs.path)}"></video>
+          <input type="text" id="sdNote" value="${esc(s.previs.note || "")}" placeholder="預演說明，例如：0–2 秒衝刺、2 秒撞擊">
+          <div class="row" style="gap:6px"><span class="muted">${esc(s.previs.path)}</span><span class="grow"></span>
+          <label class="btn small ghost">更換<input type="file" accept="video/*" hidden id="sdPrevisFile"></label><button class="small ghost" id="sdPrevisRemove">移除</button></div>`
+        : `<div class="drop" id="sdPrevisDrop">拖曳預演影片到這裡（mp4／webm／mov），或 <label class="btn small">選擇檔案<input type="file" accept="video/*" hidden id="sdPrevisFile"></label> <button class="small ghost" id="sdPrevisPath">貼本機路徑</button></div>
+          <span class="muted">提醒：給 Seedance 2.5 的預演要用方塊或模糊色塊，像真人的人偶會被整段照抄。</span>`}
+      </div>
+      <div class="field"><span>上傳清單（勾選要給 Seedance 的素材；越少越好，圖片1 固定是首幀）</span>
+        ${frameVer ? "" : '<div class="w warn">還沒有首幀：先生成首幀並設為現行版。</div>'}
+        ${frameVer && frameVer.review !== "approved" ? '<div class="w info">首幀還沒核可；確定要用這張，可以先在生成版本裡按「核可」。</div>' : ""}
+        <div class="sd-ups">${items.map(it => `<label class="sd-up ${it.use ? "" : "off"}">
+          <input type="checkbox" data-sduse="${esc(it.key)}" ${it.use ? "checked" : ""} ${it.fixed ? "disabled" : ""}>
+          ${it.kind === "video" ? '<span class="sd-vid">▶</span>' : `<img src="${fileUrl(it.path)}">`}
+          <span><b>${it.use ? esc(it.label) : "不上傳"}</b> ${esc(it.role)}<br><span class="muted">${it.use ? esc(it.name) : ""}</span></span></label>`).join("")}</div>
+      </div>
+    </div>
+    <label class="field" style="margin-top:8px"><span>需求（用中文描述這顆鏡頭要怎麼動、怎麼演）</span>
+      <textarea id="sdReq" rows="3" placeholder="例：她轉身跑進樹林，鏡頭跟拍，最後停在樹後回頭">${esc(sd.request || "")}</textarea></label>
+    <div class="row" style="align-items:center;gap:10px;margin-top:6px">
+      <label>時長 <input type="number" id="sdDur" min="4" max="15" value="${sd.duration || 5}" style="width:60px"> 秒</label>
+      <label>撰寫 <select id="sdEngine"><option value="codex" ${sd.engine !== "claude" ? "selected" : ""}>codex</option><option value="claude" ${sd.engine === "claude" ? "selected" : ""}>Claude Code</option></select></label>
+      <button id="sdGen" ${busy || !frameVer ? "disabled" : ""}>${busy ? "撰寫中…" : "產生 Seedance 提示詞"}</button>
+      ${busy ? '<span class="spin tiny"></span><span class="muted">約 30–90 秒</span>' : ""}
+    </div>
+    ${sd.prompt ? `<label class="field" style="margin-top:8px"><span>Seedance 2.5 提示詞（可以直接修改）</span>
+      <textarea id="sdPrompt" class="prompt-en" spellcheck="false">${esc(sd.prompt)}</textarea></label>
+      <div class="row" style="gap:6px;margin-top:6px"><button class="small ghost" id="sdCopy">複製提示詞</button>
+      <button class="small" id="sdPack">打包上傳素材</button><span class="muted">（照上方編號複製成 image_01_首幀… 放進專案的 seedance/${esc(s.id)}/，並開啟資料夾）</span></div>` : ""}
+    ${hist.length ? `<details class="sd-hist"><summary>歷史 ${hist.length} 版</summary>${hist.map((h, i) => `<div class="sd-h">
+      <span class="muted">${esc(h.created)}・${h.engine === "claude" ? "Claude Code" : "codex"}・${h.duration} 秒</span> ${esc((h.request || "（無需求）").slice(0, 40))}
+      <button class="small ghost" data-sdhist="${i}">載入</button></div>`).join("")}</details>` : ""}`;
+  const drop = $("#sdPrevisDrop");
+  if (drop) {
+    drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+    drop.ondragleave = () => drop.classList.remove("over");
+    drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) sdSetPrevis(s, { file: e.dataTransfer.files[0] }); };
+  }
+  const fi = $("#sdPrevisFile");
+  if (fi) fi.onchange = e => { if (e.target.files[0]) sdSetPrevis(s, { file: e.target.files[0] }); };
+}
+
+async function sdSetPrevis(s, { file, path }) {
+  try {
+    const rel = file
+      ? (await api(`/api/upload?${q()}&kind=previs&name=${encodeURIComponent(file.name)}`, { method: "POST", body: file })).path
+      : (await api(`/api/import_path?${q()}`, { method: "POST", body: JSON.stringify({ kind: "previs", path }) })).path;
+    s.previs = { path: rel, note: s.previs?.note || "" };
+    save(); renderSeedance(s); renderStrip(); toast("已加入預演影片");
+  } catch (e) { toast("加入失敗：" + e.message); }
+}
+
+async function sdGenerate(s) {
+  s.seedance ??= {};
+  const sd = s.seedance;
+  const { items, frameVer } = sdUploads(s);
+  const ups = items.filter(i => i.use);
+  if (!frameVer) return toast("先生成首幀並設為現行版");
+  st.sdBusy = s.id; renderSeedance(s);
+  try {
+    const { text } = await api(`/api/seedance_prompt?${q()}`, { method: "POST", body: JSON.stringify({
+      shot_id: s.id, engine: sd.engine || "codex", request: sd.request || "", duration: sd.duration || 5,
+      frame: frameVer.file, context: sdContext(s), uploads: ups.map(({ label, name, role }) => ({ label, name, role })) }) });
+    sd.prompt = text;
+    sd.history = [{ text, engine: sd.engine || "codex", request: sd.request || "", duration: sd.duration || 5,
+      frame: `v${frameVer.v}`, created: new Date().toLocaleString("zh-TW", { hour12: false }) }, ...(sd.history || [])].slice(0, 20);
+    save(); toast("已產生 Seedance 提示詞");
+  } catch (e) { toast("產生失敗：" + e.message); }
+  finally { st.sdBusy = null; if (shot() === s) renderSeedance(s); }
+}
+
+async function sdPack(s) {
+  const ups = sdUploads(s).items.filter(i => i.use);
+  try {
+    const { dir } = await api(`/api/seedance_pack?${q()}`, { method: "POST", body: JSON.stringify({ shot_id: s.id, prompt: s.seedance?.prompt || "", uploads: ups.map(({ path, name }) => ({ path, name })) }) });
+    toast(`已打包到 ${dir}/`);
+    api(`/api/reveal?${q()}`, { method: "POST", body: JSON.stringify({ path: `${dir}/prompt.txt` }) }).catch(() => {});
+  } catch (e) { toast("打包失敗：" + e.message); }
 }
 
 // ---------------- 依選項改寫畫面內容（codex） ----------------
@@ -841,6 +937,7 @@ function renderHero(s, g, vers) {
 
 function renderVersions() {
   const s = shot(), box = $("#versions"); if (!s || !box) return;
+  if ($("#sdCard") && !$("#sdCard").contains(document.activeElement)) renderSeedance(s);
   const g = st.gens[s.id];
   const vers = [...(g?.versions || [])].reverse();
   const busy = activeJobs(s.id).length;
@@ -975,7 +1072,7 @@ function renderStrip() {
     const g = st.gens[s.id], v = g?.versions.find(x => x.v === g.current);
     const errs = checkShot(s, p).filter(w => w.level === "error").length;
     return `<div class="shot ${s.id === st.cur ? "on" : ""}" data-shot="${esc(s.id)}">
-      <div class="th">${v?.file ? `<img src="${fileUrl(v.file)}">` : (s.z ? `${esc(s.z)}·${esc(s.y || "?")}` : "—")}${activeJobs(s.id).length ? '<div class="th-busy"><div class="spin"></div></div>' : ""}</div>
+      <div class="th">${v?.file ? `<img src="${fileUrl(v.file)}">` : (s.z ? `${esc(s.z)}·${esc(s.y || "?")}` : "—")}${activeJobs(s.id).length ? '<div class="th-busy"><div class="spin"></div></div>' : ""}${s.previs?.path ? '<span class="th-tag">預演</span>' : ""}${s.seedance?.prompt ? '<span class="th-tag sd">SD</span>' : ""}</div>
       <div class="id">${esc(s.id)} ${errs ? '<span class="badge err">!</span>' : ""} ${esc(s.title || "")}</div>
       <div class="cd">${esc(codeLine(s, p) || "未設定")}</div></div>`;
   }).join("") + `<div class="shot add" id="addShot" title="新增分鏡">＋</div>`;
@@ -1148,6 +1245,13 @@ document.addEventListener("click", e => {
     toast("已套用改寫");
     return;
   }
+  if (t.id === "sdGen") { sdGenerate(s); return; }
+  if (t.id === "sdPack") { sdPack(s); return; }
+  if (t.id === "sdCopy") { navigator.clipboard.writeText($("#sdPrompt").value).then(() => toast("已複製 Seedance 提示詞")); return; }
+  if (t.id === "sdPrevisRemove") { if (confirm("移除這顆分鏡的預演影片？檔案會留在專案的 previs/。")) { delete s.previs; save(); renderSeedance(s); renderStrip(); } return; }
+  if (t.id === "sdPrevisPath") { const pth = prompt("貼上預演影片的完整路徑（會複製一份進專案）："); if (pth) sdSetPrevis(s, { path: pth.trim().replace(/^"|"$/g, "") }); return; }
+  const hb = t.closest("[data-sdhist]");
+  if (hb) { const h = s.seedance.history[+hb.dataset.sdhist]; Object.assign(s.seedance, { prompt: h.text, request: h.request, duration: h.duration, engine: h.engine }); save(); renderSeedance(s); toast("已載入這一版"); return; }
   const mc = t.closest("[data-mjcopy]");
   if (mc) { copyImage(mc.dataset.mjcopy); return; }
   const mr = t.closest("[data-mjreveal]");
@@ -1215,6 +1319,13 @@ document.addEventListener("input", e => {
   if (e.target.id === "fTitle") { s.title = e.target.value; save(); renderStrip(); }
   else if (e.target.id === "fAction") { s.action = e.target.value; save(); refreshDerived(); renderStrip(); }
   else if (e.target.id === "promptEn") onPromptInput(e);
+  else if (["sdReq", "sdDur", "sdEngine", "sdPrompt"].includes(e.target.id)) {
+    s.seedance ??= {};
+    const k = { sdReq: "request", sdDur: "duration", sdEngine: "engine", sdPrompt: "prompt" }[e.target.id];
+    s.seedance[k] = k === "duration" ? Math.min(15, Math.max(4, +e.target.value || 5)) : e.target.value;
+    save();
+  }
+  else if (e.target.id === "sdNote") { s.previs.note = e.target.value; save(); }
   else if (e.target.id === "mjOw") { s.mjOw = +e.target.value; e.target.nextElementSibling.textContent = e.target.value; save(); refreshDerived(); }
   else if (e.target.dataset?.refnote) {
     const r = (s.refs || []).find(x => x.id === e.target.dataset.refnote);
@@ -1224,6 +1335,15 @@ document.addEventListener("input", e => {
 });
 
 document.addEventListener("change", e => {
+  const use = e.target.dataset?.sduse;
+  if (use !== undefined) {
+    const s = shot(); s.seedance ??= {};
+    const on = new Set(s.seedance.on || []), off = new Set(s.seedance.off || []);
+    if (e.target.checked) { on.add(use); off.delete(use); } else { off.add(use); on.delete(use); }
+    s.seedance.on = [...on]; s.seedance.off = [...off];
+    save(); renderSeedance(s); return;
+  }
+  if (e.target.id === "sdEngine") { const s = shot(); s.seedance ??= {}; s.seedance.engine = e.target.value; save(); return; }
   if (e.target.dataset?.gear && e.target.closest("#editor")) {
     const s = shot(); s.gear ??= {};
     if (e.target.value) s.gear[e.target.dataset.gear] = e.target.value; else delete s.gear[e.target.dataset.gear];

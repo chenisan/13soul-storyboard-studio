@@ -794,7 +794,8 @@ function samplesHtml() {
     return `<figure class="sample ${on ? "on" : ""}" data-apply="${axis}:${esc(val)}" title="${s ? `套用到 ${esc(s.id)}` : ""}">${ph}<figcaption>${esc(label)}${on ? '　<span class="badge ok">目前</span>' : ""}</figcaption></figure>`;
   };
   const done = Object.values(st.samples).filter(x => x.file).length;
-  return `<div class="muted">${s ? `點一張圖就把那個設定套用到 <b>${esc(s.id)}</b>，提示詞會跟著改；框起來的是 ${esc(s.id)} 目前的設定。` : "先選一顆分鏡，點圖就能套用設定。"}
+  return `${st.sampleApplied?.length ? `<div class="sample-applied">已套用到 ${esc(s?.id || "")}：${st.sampleApplied.map(esc).join("、")}</div>` : ""}
+    <div class="muted">${s ? `可以連續點選：每組各選一個，點了馬上套用到 <b>${esc(s.id)}</b>，提示詞跟著改；同一組再點另一張就換掉。框起來的是目前的設定，選好按「完成」。` : "先選一顆分鏡，點圖就能套用設定。"}
     同一個角色、同一個場景，每組只改一個變數（已完成 ${done} 格）。右上角 ↗ 開原圖。重新產生：<code>node make_samples.mjs all</code></div>
     ${SAMPLE_GROUPS.map(g => `<h4>${esc(g.title)}</h4><div class="sample-grid">${g.items.map(it => card(it, g.axis)).join("")}</div>`).join("")}`;
 }
@@ -819,13 +820,17 @@ function applySample(axis, val) {
   else if (axis === "l") s.gear.lens = val;
   else if (axis === "b") for (const [k, v] of Object.entries(SAMPLE_BODY[val])) { if (v) s.gear[k] = v; else delete s.gear[k]; }
   save(); renderEditor(); renderStrip();
-  const label = SAMPLE_GROUPS.find(g => g.axis === axis)?.items.find(([v]) => v === val)?.[1] || val;
-  toast(`已套用「${label}」到 ${s.id}，提示詞已更新`);
+  const group = SAMPLE_GROUPS.find(g => g.axis === axis);
+  const label = group?.items.find(([v]) => v === val)?.[1] || val;
+  // 同一組只留最後選的那個
+  st.sampleApplied = [...(st.sampleApplied || []).filter(x => !group?.items.some(([, l]) => l === x)), label];
+  toast(`已套用「${label}」到 ${s.id}`);
 }
 
 function openSamples() {
+  st.sampleApplied = [];  // 這次打開後套用過的項目（每組只留最後一個）
   openDialog(`<h3>範例對照表${st.sampleTitle ? "：" + esc(st.sampleTitle) : ""}</h3><div id="sampleBody">${samplesHtml()}</div>
-    <div class="dlg-actions"><button value="cancel" class="ghost">關閉</button></div>`, () => true);
+    <div class="dlg-actions"><button value="cancel">完成</button></div>`, () => true);
 }
 
 // ---------------- 攝影設備 ----------------
@@ -1549,7 +1554,8 @@ $("#dlg").addEventListener("click", e => {
   if (!card) return;
   const [axis, ...rest] = card.dataset.apply.split(":");
   applySample(axis, rest.join(":"));
-  $("#dlg").close();
+  const dlg = $("#dlg"), top = dlg.scrollTop, body = $("#sampleBody");
+  if (body) { body.innerHTML = samplesHtml(); dlg.scrollTop = top; }  // 不關視窗，更新框選；捲動位置不變
 });
 
 // 角色卡／場景面板

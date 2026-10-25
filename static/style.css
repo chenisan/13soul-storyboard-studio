@@ -426,3 +426,4 @@ dialog, .asset-pop, .menu-pop { border-radius: 4px; }
 .panel-head button { display: inline-flex; align-items: center; gap: 4px; }
 .panel-head button .ico { width: 14px; height: 14px; }
 .menu-pop button { border: 0; border-radius: 3px; }
+.sample-applied { font-size: 13px; padding: 6px 10px; background: var(--panel2); border-left: 2px solid var(--ok); margin-bottom: 6px; }

@@ -230,3 +230,21 @@ figure.sample.on { border-color: var(--ok); }
 .sd-h { display: flex; gap: 8px; align-items: center; padding: 2px 0; }
 .th-tag { position: absolute; left: 4px; top: 4px; font-size: 10px; background: rgba(0, 0, 0, .7); color: var(--accent2); padding: 1px 5px; border-radius: 3px; }
 .th-tag.sd { left: auto; right: 4px; color: var(--info); }
+
+/* 可收合區塊（手機設定頁風格） */
+.sec-tools { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.sec-bar { display: flex; align-items: center; gap: 8px; width: calc(100% + 24px); margin: -12px -12px 10px; padding: 10px 12px;
+  background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0; color: var(--text); text-align: left; cursor: pointer; }
+.sec-bar:hover { background: var(--panel2); }
+.sec-bar b { color: var(--accent2); font-size: 13px; white-space: nowrap; }
+.sec-bar .chev { color: var(--muted); width: 12px; transition: transform .15s; }
+.sec-sum { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 1; }
+.card.collapsed { padding-bottom: 0; }
+.card.collapsed > .sec-bar { margin-bottom: 0; border-bottom: 0; border-radius: 8px; }
+.card.collapsed > .sec-bar .chev { transform: rotate(-90deg); }
+.card.collapsed > :not(.sec-bar) { display: none !important; }
+.strip-bar { width: 100%; margin: 0 0 6px; padding: 4px 2px; border: 0; border-radius: 4px; }
+footer.strip.collapsed { padding-top: 4px; padding-bottom: 4px; }
+footer.strip.collapsed .strip-bar { margin: 0; }
+footer.strip.collapsed > :not(.strip-bar) { display: none; }
+@media (max-width: 700px) { .sec-sum { display: none; } }

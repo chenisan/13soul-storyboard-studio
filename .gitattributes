@@ -1,0 +1,4 @@
+# 一律 LF；start.bat 必須 CRLF，cmd 才讀得懂
+* text=auto eol=lf
+*.bat text eol=crlf
+*.png binary

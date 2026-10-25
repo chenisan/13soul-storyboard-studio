@@ -1,0 +1,9 @@
+# 個人設定與資料：不上傳
+.env
+projects/
+local/
+
+# Python
+__pycache__/
+*.pyc
+*.tmp

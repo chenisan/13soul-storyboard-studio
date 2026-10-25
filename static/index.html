@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>分鏡設計台</title>
+<link rel="stylesheet" href="/static/style.css">
+<script type="importmap">{ "imports": { "three": "/static/vendor/three.module.js" } }</script>
+</head>
+<body>
+<header class="top">
+  <h1>分鏡設計台</h1>
+  <select id="projectSel" title="專案"></select>
+  <button id="newProject" class="ghost">＋專案</button>
+  <button id="projectSettings" class="ghost">專案設定</button>
+  <span id="queueInfo" class="queue"></span>
+  <span class="grow"></span>
+  <button id="exportMd" class="ghost">匯出分鏡表</button>
+  <button id="exportList" class="ghost">複製分鏡清單</button>
+  <button id="sampleBtn" class="ghost" title="同一個角色用不同鏡頭組合生成的對照圖">範例對照表</button>
+  <button id="assetToggle" class="ghost">角色卡／場景</button>
+  <span id="saveState" class="muted"></span>
+
+  <!-- 角色卡與場景：右上角按鈕展開的面板，點外面或按 Esc 收起 -->
+  <div id="assetPanel" class="asset-pop" hidden>
+    <section>
+      <div class="sec-head"><h2>角色卡</h2>
+        <label class="btn small">上傳<input type="file" accept="image/*" multiple hidden data-upload="characters"></label>
+        <button class="small ghost" data-import="characters">路徑匯入</button></div>
+      <div class="drop" data-drop="characters">拖曳角色卡到這裡</div>
+      <div id="charList" class="asset-list"></div>
+    </section>
+    <section>
+      <div class="sec-head"><h2>場景</h2>
+        <label class="btn small">上傳<input type="file" accept="image/*" multiple hidden data-upload="scenes"></label>
+        <button class="small ghost" data-import="scenes">路徑匯入</button></div>
+      <div class="drop" data-drop="scenes">拖曳場景圖到這裡</div>
+      <div id="sceneList" class="asset-list"></div>
+    </section>
+  </div>
+</header>
+
+<div class="layout">
+  <main id="editor" class="editor"></main>
+</div>
+
+<footer class="strip">
+  <div id="shotStrip" class="shots"></div>
+  <div id="pairWarn" class="pair-warn"></div>
+</footer>
+
+<dialog id="dlg"><form method="dialog" id="dlgBody"></form></dialog>
+<div id="toast" class="toast"></div>
+<div id="sampleTip" class="sample-tip" hidden></div>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>

@@ -30,13 +30,15 @@ async function api(path, body) {
 const BASE = { z: "Z6", y: "Y4", x: "X2", gear: { focal: 50 } };
 const TIGHT = { ...BASE, z: "Z4" };  // 焦段／鏡頭／機身組：腰部以上，比較透視與質感
 const ACTION = `${CHAR.name_en} stands naturally in ${SCENE.name_en}, arms relaxed at the sides, calm expression.`;
+// 特寫、大特寫只描述臉部，避免「站著、雙手垂放」把畫面拉寬
+const ACTION_FACE = `${CHAR.name_en} looks calmly ahead, eyes steady, a quiet expression.`;
 
 function sampleShots() {
   const shots = [];
   const add = (id, title, over, sample) => {
     const old = shots.find(s => s.id === id);
     if (old) { old.sample.push(...sample); return; }
-    shots.push({ id, title, action: ACTION, chars: ["C1"], subject: "C1", scene: "SC1", r: "single", m: "static", mods: [],
+    shots.push({ id, title, action: ["Z1", "Z2"].includes(over.z) ? ACTION_FACE : ACTION, chars: ["C1"], subject: "C1", scene: "SC1", r: "single", m: "static", mods: [],
       ...BASE, ...over, gear: { ...BASE.gear, ...(over.gear || {}) }, sample });
   };
   for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9]) add(n === 6 ? "BASE" : `Z${n}`, n === 6 ? "基準（Z6 Y4 X2 50mm）" : `景別 Z${n}`, { z: `Z${n}` }, [["z", `Z${n}`]]);
@@ -69,6 +71,7 @@ async function ensureProject() {
     p.look = (src.look || "").startsWith(OLD_LOOK) ? src.look.slice(OLD_LOOK.length).trim() : src.look;
     p.rules = src.rules;
   }
+  if ((p.look || "").startsWith(OLD_LOOK)) p.look = p.look.slice(OLD_LOOK.length).trim();  // 舊版伺服器建立的專案預設
   p.ratio = "youtube";
   p.gear = { body: "arricam", lens: "cooke_panchro", stock: "v3_500t_push" };
   p.shots = sampleShots();

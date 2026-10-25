@@ -2,36 +2,36 @@
 // 只有這一份；改代碼或英文描述都在這裡改。
 
 export const Z = [
-  { id: "Z1", zh: "大特寫", en: "extreme close-up, a single detail fills the frame", top: 0.04, bot: 0.12 },
-  { id: "Z2", zh: "特寫", en: "close-up, the whole face fills the frame", top: 0.0, bot: 0.17 },
-  { id: "Z3", zh: "近景", en: "medium close-up, framed from the chest up", top: 0.0, bot: 0.28 },
-  { id: "Z4", zh: "中近景", en: "medium shot framed from the waist up", top: 0.0, bot: 0.42 },
-  { id: "Z5", zh: "中景", en: "medium shot framed from the hips up", top: 0.0, bot: 0.52 },
-  { id: "Z6", zh: "四分之三身景", en: "three-quarter body shot, American shot framed from the knees up", top: 0.0, bot: 0.74 },
-  { id: "Z7", zh: "全景", en: "full shot, the entire body head to toe in frame", top: 0.0, bot: 1.0 },
-  { id: "Z8", zh: "遠景", en: "long shot, the figure occupies about a third of the frame height, environment around", top: 0.0, bot: 1.0 },
-  { id: "Z9", zh: "大遠景", en: "extreme long shot, the figure is tiny within a vast environment", top: 0.0, bot: 1.0 },
+  { id: "Z1", zh: "大特寫", en: "EXTREME CLOSE-UP: only the subject's eyes and brows fill the entire frame edge to edge; nothing below the nose, no mouth, no shoulders, no body", top: 0.04, bot: 0.12 },
+  { id: "Z2", zh: "特寫", en: "CLOSE-UP: only the subject's face from chin to forehead fills the frame; no shoulders, no clothing, no body", top: 0.0, bot: 0.17 },
+  { id: "Z3", zh: "近景", en: "MEDIUM CLOSE-UP: head and shoulders, the frame cuts at mid-chest", top: 0.0, bot: 0.28 },
+  { id: "Z4", zh: "中近景", en: "MEDIUM SHOT: the frame cuts at the waist, nothing below the waist is visible", top: 0.0, bot: 0.42 },
+  { id: "Z5", zh: "中景", en: "MEDIUM SHOT: the frame cuts at mid-thigh, hands and hips visible, knees not visible", top: 0.0, bot: 0.52 },
+  { id: "Z6", zh: "四分之三身景", en: "THREE-QUARTER SHOT: the frame cuts just above the knees, feet not visible", top: 0.0, bot: 0.74 },
+  { id: "Z7", zh: "全景", en: "FULL SHOT: the entire body from head to feet is in frame with a little space above and below", top: 0.0, bot: 1.0 },
+  { id: "Z8", zh: "遠景", en: "LONG SHOT: the subject is small, about one third of the frame height, surrounded by the environment", top: 0.0, bot: 1.0 },
+  { id: "Z9", zh: "大遠景", en: "EXTREME LONG SHOT: the subject is a tiny figure, less than one tenth of the frame height, dwarfed by a vast landscape", top: 0.0, bot: 1.0 },
 ];
 
 export const Y = [
-  { id: "Y1", zh: "蟲視", deg: -75, en: "worm's-eye view, camera on the ground looking steeply up" },
-  { id: "Y2", zh: "仰視", deg: -40, en: "low-angle shot looking up at the subject" },
-  { id: "Y3", zh: "輕微仰視", deg: -15, en: "slightly low angle" },
-  { id: "Y4", zh: "平視", deg: 0, en: "eye-level camera" },
-  { id: "Y5", zh: "輕微俯視", deg: 15, en: "slightly high angle" },
-  { id: "Y6", zh: "俯視", deg: 40, en: "high-angle shot looking down on the subject" },
-  { id: "Y7", zh: "垂直頂視", deg: 90, en: "top-down overhead shot, camera directly above looking straight down" },
+  { id: "Y1", zh: "蟲視", deg: -75, en: "EXTREME LOW ANGLE, WORM'S-EYE VIEW: the camera lies on the ground and points steeply up at the subject; we see the underside of the chin and the sky or treetops behind; the subject towers over the lens" },
+  { id: "Y2", zh: "仰視", deg: -40, en: "LOW ANGLE: the camera is at knee height looking clearly up at the subject; the horizon is low in the frame and the subject looks imposing" },
+  { id: "Y3", zh: "輕微仰視", deg: -15, en: "SLIGHTLY LOW ANGLE: the camera is at chest height looking slightly up at the subject" },
+  { id: "Y4", zh: "平視", deg: 0, en: "EYE LEVEL: the camera is exactly at the subject's eye height, level, no tilt" },
+  { id: "Y5", zh: "輕微俯視", deg: 15, en: "SLIGHTLY HIGH ANGLE: the camera is just above the subject's head height looking slightly down" },
+  { id: "Y6", zh: "俯視", deg: 40, en: "HIGH ANGLE: the camera is well above the subject looking clearly down; lots of ground visible around the subject, the subject looks small" },
+  { id: "Y7", zh: "垂直頂視", deg: 90, en: "TOP-DOWN OVERHEAD VIEW: the camera is directly above, pointing straight down at the top of the subject's head and shoulders; the ground fills the whole background, no horizon, no sky" },
 ];
 
 // 以主體臉部朝向為 0°，從上方看順時鐘（主體的右手邊為 90°）
 export const X = [
   { id: "X1", zh: "正面", deg: 0, en: "front view, the subject faces the camera" },
   { id: "X2", zh: "右前四分之三", deg: 45, en: "three-quarter front view, camera at the subject's front-right" },
-  { id: "X3", zh: "右側面", deg: 90, en: "side profile view from the subject's right side" },
-  { id: "X4", zh: "右後四分之三", deg: 135, en: "three-quarter rear view, camera behind the subject's right shoulder" },
-  { id: "X5", zh: "背面", deg: 180, en: "rear view from directly behind the subject" },
-  { id: "X6", zh: "左後四分之三", deg: 225, en: "three-quarter rear view, camera behind the subject's left shoulder" },
-  { id: "X7", zh: "左側面", deg: 270, en: "side profile view from the subject's left side" },
+  { id: "X3", zh: "右側面", deg: 90, en: "STRICT SIDE PROFILE from the subject's right side: body and face turned 90 degrees away from the camera, looking toward frame right; the subject does NOT look at the camera", away: "profile" },
+  { id: "X4", zh: "右後四分之三", deg: 135, en: "THREE-QUARTER REAR VIEW from behind the subject's right shoulder: we see the back and the right shoulder, only a sliver of the cheek; the face is turned away and the subject does NOT turn toward the camera", away: "back" },
+  { id: "X5", zh: "背面", deg: 180, en: "REAR VIEW from directly behind: we see the subject's back and the back of the head; the face is NOT visible at all and the subject does NOT turn toward the camera", away: "back" },
+  { id: "X6", zh: "左後四分之三", deg: 225, en: "THREE-QUARTER REAR VIEW from behind the subject's left shoulder: we see the back and the left shoulder, only a sliver of the cheek; the face is turned away and the subject does NOT turn toward the camera", away: "back" },
+  { id: "X7", zh: "左側面", deg: 270, en: "STRICT SIDE PROFILE from the subject's left side: body and face turned 90 degrees away from the camera, looking toward frame left; the subject does NOT look at the camera", away: "profile" },
   { id: "X8", zh: "左前四分之三", deg: 315, en: "three-quarter front view, camera at the subject's front-left" },
 ];
 
@@ -112,14 +112,14 @@ export const LENSES = [
   { id: "zeiss_macro", name: "Zeiss Master Macro", type: "微距", macro: true, en: "macro lens, extreme close-focus detail" },
 ];
 export const FOCALS = [
-  { mm: 14, en: "ultra-wide perspective with strong depth exaggeration" },
-  { mm: 18, en: "very wide perspective" },
+  { mm: 14, en: "ultra-wide 14mm lens very close to the subject: strong perspective distortion, exaggerated depth, the nearest body parts look larger, background stretched far away" },
+  { mm: 18, en: "very wide lens close to the subject: noticeable perspective distortion and deep space" },
   { mm: 24, en: "wide-angle perspective" },
   { mm: 35, en: "natural, slightly wide perspective" },
   { mm: 50, en: "normal perspective" },
   { mm: 85, en: "flattering portrait compression" },
   { mm: 100, en: "telephoto compression" },
-  { mm: 135, en: "long telephoto compression, background pulled close" },
+  { mm: 135, en: "135mm telephoto from far away: flattened perspective, the background is compressed, looks large and close behind the subject, very shallow depth of field" },
 ];
 export const STOCKS = [
   { id: "v3_500t_push", name: "Kodak Vision3 500T（增感一級）", en: "Kodak Vision3 500T film stock pushed one stop: organic film grain, soft highlight roll-off with gentle halation, lifted film-grey blacks" },
@@ -279,8 +279,8 @@ function cameraEn(s, project, kind) {
   const bits = [];
   const subj = s.subject ? charNameEn(project, s.subject) : "the subject";
   const others = (s.chars || []).filter(c => c !== s.subject).map(c => charNameEn(project, c));
-  if (s.z) bits.push(zOf(s.z).en);
-  if (s.y) bits.push(yOf(s.y).en);
+  if (s.z) bits.push(zOf(s.z).en.replaceAll("the subject", subj));
+  if (s.y) bits.push(yOf(s.y).en.replaceAll("the subject", subj));
   if (s.x) bits.push(xOf(s.x).en.replaceAll("the subject", subj));
   if (s.r === "ots") bits.push(others.length ? `over-the-shoulder shot past ${subj}'s shoulder, looking toward ${others.join(" and ")}, whose face is clearly visible` : rOf("ots").en);
   else if ((s.r || "single") === "single") bits.push(`single-character shot: only ${subj} is in the frame, no other people anywhere in the shot`);
@@ -315,22 +315,36 @@ function cameraZh(s, project, kind) {
 }
 
 // kind: 'still'＝送 codex 的首幀；'video'＝給 Seedance 等影片模型的影片提示詞
+// 「臉要看得見」之類的句子：背面／側面鏡頭會和它打架（模型會讓角色轉頭看鏡頭），要拿掉
+const FACE_VISIBLE = /[^.;,]*\b(face|eyes)\b[^.;,]*\b(visible|shown|seen|uncovered)\b[^.;,]*[.;,]?/gi;
+export const stripFaceVisible = text => (text || "").replace(FACE_VISIBLE, "").replace(/\s{2,}/g, " ").replace(/\s+([.;,])/g, "$1").trim();
+
 export function buildPrompt(s, project, kind = "still") {
   const refs = refsOf(s, project);
   const en = [], zh = [];
+  const away = s.x ? xOf(s.x).away : null;  // back／profile：臉不朝鏡頭
+  const tight = s.z === "Z1" || s.z === "Z2";
+  // 鏡頭放第一行：範例顯示放在中段會被後面的角色描述蓋過
+  const cam = cameraEn(s, project, kind);
+  if (cam) { en.push(`CAMERA (most important, follow exactly): ${cam}.`); zh.push(`鏡頭（最重要，務必照做）：${cameraZh(s, project, kind)}。`); }
   en.push(kind === "still" ? "A single cinematic film still, one continuous scene, no collage, no split panels." : "Cinematic live-action shot.");
   zh.push(kind === "still" ? "單張電影劇照，單一場景，不拼貼、不分格。" : "電影實拍鏡頭。");
   if (refs.length) {
-    en.push(refs.map((r, i) => `Image ${i + 1} is ${r.kind === "extra" ? "an" : "the"} ${r.label}`).join("; ") + ". Keep each character's face, hair and costume exactly as in their reference; use the location reference for the environment, light direction and atmosphere.");
-    zh.push(refs.map((r, i) => `圖片${i + 1}＝${r.labelZh}`).join("；") + "。角色的臉、髮型、服裝照角色卡；環境、光向、空氣感照場景圖。");
+    const keep = away === "back" ? "Keep each character's hair, body shape and costume (including its back) exactly as in their reference; the face is turned away from the camera in this shot"
+      : away === "profile" ? "Keep each character's face (seen in profile), hair and costume exactly as in their reference"
+      : "Keep each character's face, hair and costume exactly as in their reference";
+    en.push(refs.map((r, i) => `Image ${i + 1} is ${r.kind === "extra" ? "an" : "the"} ${r.label}`).join("; ") + `. ${keep}; use the location reference for the environment, light direction and atmosphere.`);
+    zh.push(refs.map((r, i) => `圖片${i + 1}＝${r.labelZh}`).join("；") + `。${away === "back" ? "髮型、身形、服裝（含背面）照角色卡，這顆鏡頭臉朝向別處" : "角色的臉、髮型、服裝照角色卡"}；環境、光向、空氣感照場景圖。`);
   }
-  const cam = cameraEn(s, project, kind);
-  if (cam) { en.push(`Camera: ${cam}.`); zh.push(`鏡頭：${cameraZh(s, project, kind)}。`); }
-  if (s.action?.trim()) { en.push(`Action: ${s.action.trim()}`); zh.push(`畫面內容：${s.action.trim()}`); }
+  if (s.action?.trim()) {
+    en.push(`Action: ${s.action.trim()}`); zh.push(`畫面內容：${s.action.trim()}`);
+    if (tight) { en.push("Any body, pose or costume details in the action are outside this tight frame; they must NOT widen the shot."); zh.push("畫面內容裡的身體、姿勢細節在畫面外，不能因此把畫面拉寬。"); }
+  }
   for (const id of s.chars || []) {
     const c = project.characters.find(c => c.id === id);
     if (!c) continue;
-    const desc = [c.lock, c.outfit].filter(x => x?.trim()).join(" ");
+    const lock = away ? stripFaceVisible(c.lock) : c.lock;
+    const desc = [lock, c.outfit].filter(x => x?.trim()).join(" ");
     if (desc) { en.push(`${nameEn(c)}: ${desc}`); zh.push(`${c.name}：（角色鎖定描述，見英文）`); }
   }
   const sc = project.scenes.find(x => x.id === s.scene);

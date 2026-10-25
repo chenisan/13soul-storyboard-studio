@@ -11,15 +11,22 @@
 <header class="top">
   <h1>分鏡設計台</h1>
   <select id="projectSel" title="專案"></select>
-  <button id="newProject" class="ghost">＋專案</button>
-  <button id="projectSettings" class="ghost">專案設定</button>
   <span id="queueInfo" class="queue"></span>
   <span class="grow"></span>
-  <button id="exportMd" class="ghost">匯出分鏡表</button>
-  <button id="exportList" class="ghost">複製分鏡清單</button>
-  <button id="sampleBtn" class="ghost" title="同一個角色用不同鏡頭組合生成的對照圖">範例對照表</button>
-  <button id="assetToggle" class="ghost">角色卡／場景</button>
   <span id="saveState" class="muted"></span>
+  <button id="menuBtn" class="ghost menu-btn" aria-label="選單" aria-expanded="false">☰</button>
+
+  <!-- 漢堡選單：點項目、點外面或按 Esc 收起 -->
+  <nav id="menuPanel" class="menu-pop" hidden>
+    <button id="newProject">＋ 新專案</button>
+    <button id="projectSettings">專案設定</button>
+    <hr>
+    <button id="assetToggle">角色卡／場景</button>
+    <button id="sampleBtn" title="同一個角色用不同鏡頭組合生成的對照圖">範例對照表</button>
+    <hr>
+    <button id="exportMd">匯出分鏡表</button>
+    <button id="exportList">複製分鏡清單</button>
+  </nav>
 
   <!-- 角色卡與場景：右上角按鈕展開的面板，點外面或按 Esc 收起 -->
   <div id="assetPanel" class="asset-pop" hidden>

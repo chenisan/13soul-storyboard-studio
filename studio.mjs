@@ -11,6 +11,9 @@
 //   node studio.mjs set <專案> <S01> 欄位=值 …         例：z=Z3 action="她回頭" mods=逆光剪影,大光圈虛化
 //   node studio.mjs previs <專案> <S01> <影片路徑> [--note "說明"]
 //   node studio.mjs seedance <專案> <S01> [--request "需求"] [--duration 5] [--engine codex|claude] [--pack]
+//   node studio.mjs notes <專案> [--all]               列出網頁上寫給 Claude 的備註（預設只列待處理）
+//   node studio.mjs done <專案> <S01> <n1|all> [--reply "處理說明"]   標記備註完成並回覆
+//   node studio.mjs note <專案> <S01> "內容"            留一則備註（例如請使用者確認）
 //
 // 計畫檔格式見 examples/plan_example.json 與 README「指令工具」。
 import fs from "node:fs";
@@ -38,7 +41,7 @@ const qp = name => `p=${encodeURIComponent(name)}`;
 const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const flags = new Set(process.argv.filter(a => a.startsWith("--")));
 const opt = k => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : undefined; };
-const VALUE_OPTS = ["--ratio", "--lang", "--note", "--request", "--duration", "--engine"];  // 後面接值的選項
+const VALUE_OPTS = ["--ratio", "--lang", "--note", "--request", "--duration", "--engine", "--reply"];  // 後面接值的選項
 const args = process.argv.slice(2).filter((a, i, all) => !a.startsWith("--") && !(i > 0 && VALUE_OPTS.includes(all[i - 1])));
 
 async function loadProject(name) {
@@ -200,7 +203,8 @@ function printList(p, gens) {
   for (const [i, s] of p.shots.entries()) {
     const g = gens?.[s.id], v = g?.versions?.find(x => x.v === g.current);
     const ws = checkShot(s, p).filter(w => w.level !== "info");
-    console.log(`${s.id.padEnd(5)} ${v?.file ? "■" : "□"} ${(s.title || "").padEnd(10)} ${codeLine(s, p)}`);
+    const pending = (s.notes || []).filter(x => x.status !== "done").length;
+    console.log(`${s.id.padEnd(5)} ${v?.file ? "■" : "□"} ${(s.title || "").padEnd(10)} ${codeLine(s, p)}${pending ? `　✎ 待處理備註 ${pending}` : ""}`);
     if (s.action) console.log(`        畫面：${s.action}`);
     for (const w of ws) console.log(`        ${w.level === "error" ? "✖" : "⚠"} ${w.msg}`);
     if (i > 0) for (const w of checkPair(p.shots[i - 1], s)) console.log(`        ↔ ${w.msg}`);
@@ -371,8 +375,49 @@ async function cmdSeedance([name, id]) {
   }
 }
 
+// ---------------- 備註（網頁 ↔ Claude 來回溝通） ----------------
+const nowText = () => new Date().toLocaleString("zh-TW", { hour12: false });
+
+async function cmdNotes([name]) {
+  if (!name) throw new Error("用法：notes <專案> [--all]");
+  const p = await loadProject(name);
+  const all = flags.has("--all");
+  let n = 0;
+  for (const s of p.shots) {
+    const list = (s.notes || []).filter(x => all || x.status !== "done");
+    if (!list.length) continue;
+    console.log(`\n${s.id}　${s.title || ""}　${codeLine(s, p)}`);
+    for (const x of list) {
+      n++;
+      console.log(`  #${x.id}${x.status === "done" ? "（已處理）" : ""}${x.by === "claude" ? "（Claude 留）" : ""}　${x.text}　〔${x.created}〕`);
+      if (x.reply) console.log(`      ↳ ${x.reply}`);
+    }
+  }
+  console.log(n ? `\n共 ${n} 則${all ? "" : "待處理"}備註。處理完用：node studio.mjs done ${name} <分鏡> <備註編號> --reply "說明"` : `專案「${name}」沒有${all ? "" : "待處理的"}備註。`);
+}
+
+async function cmdDone([name, id, which]) {
+  if (!which) throw new Error("用法：done <專案> <S01> <n1|all> [--reply 處理說明]");
+  const { p, s } = await shotOf(name, id);
+  const list = (s.notes || []).filter(x => which === "all" ? x.status !== "done" : x.id === which || `#${x.id}` === which);
+  if (!list.length) throw new Error(`${id} 沒有備註 ${which}（待處理：${(s.notes || []).filter(x => x.status !== "done").map(x => x.id).join("、") || "無"}）`);
+  for (const x of list) Object.assign(x, { status: "done", done_at: nowText(), ...(opt("--reply") !== undefined ? { reply: opt("--reply") } : {}) });
+  await saveProject(name, p);
+  console.log(`已標記完成：${id} ${list.map(x => "#" + x.id).join("、")}${opt("--reply") ? `（回覆：${opt("--reply")}）` : ""}`);
+}
+
+async function cmdNote([name, id, text]) {
+  if (!text) throw new Error("用法：note <專案> <S01> \"內容\"");
+  const { p, s } = await shotOf(name, id);
+  s.notes ??= [];
+  const n = Math.max(0, ...s.notes.map(x => parseInt(String(x.id).replace(/\D/g, ""), 10) || 0)) + 1;
+  s.notes.push({ id: `n${n}`, text, created: nowText(), status: "open", by: "claude" });
+  await saveProject(name, p);
+  console.log(`已在 ${id} 留下備註 #n${n}`);
+}
+
 const cmds = { new: cmdNew, import: cmdImport, list: cmdList, export: cmdExport, gen: cmdGen, status: cmdStatus,
-  show: cmdShow, set: cmdSet, previs: cmdPrevis, seedance: cmdSeedance };
+  show: cmdShow, set: cmdSet, previs: cmdPrevis, seedance: cmdSeedance, notes: cmdNotes, done: cmdDone, note: cmdNote };
 const [cmd, ...rest] = args;
 if (!cmds[cmd]) {
   const lines = fs.readFileSync(new URL(import.meta.url), "utf8").split("\n");

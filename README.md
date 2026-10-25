@@ -152,6 +152,9 @@ node studio.mjs show <專案> <S01>
 node studio.mjs set <專案> <S01> 欄位=值 …
 node studio.mjs previs <專案> <S01> <影片路徑> [--note 說明]
 node studio.mjs seedance <專案> <S01> [--request 需求] [--duration 5] [--engine codex|claude] [--pack]
+node studio.mjs notes <專案> [--all]
+node studio.mjs done <專案> <S01> <n1|all> [--reply 處理說明]
+node studio.mjs note <專案> <S01> "內容"
 ```
 
 - **分鏡計畫檔**：JSON，寫專案、角色（名稱、角色卡圖片、鎖定描述）、場景、每顆分鏡（景別 z、俯仰 y、方位 x、關係 r、運鏡 m、修飾、焦段、畫面內容）。範例見 `examples/plan_example.json`。角色、場景、修飾、鏡頭都可以用名稱寫，例如修飾寫「輪廓光」。圖片路徑以計畫檔所在資料夾為準。
@@ -166,6 +169,8 @@ node studio.mjs seedance <專案> <S01> [--request 需求] [--duration 5] [--eng
 - **previs**、**seedance**：掛預演影片、撰寫 Seedance 提示詞（`--pack` 順便打包上傳素材）。結果寫回分鏡，網頁上看得到。
 - **gen**：沒加 `--yes` 只列出會生成哪些、需要多久，不會送出。`--missing` 只生還沒有圖的。有紅色錯誤的分鏡會略過。網頁上手改過的提示詞優先使用。
 - 網頁開著同一個專案時，匯入後 10 秒內會自動重新載入。專案存檔有版本號，網頁和指令同時修改時，後到的會被拒絕，不會互相覆蓋。
+
+指令和網頁可以同時開著、來回調整：網頁寫「備註給 Claude」，指令用 `notes` 讀取、`done --reply` 回覆。完整流程見 [導演台工作流.md](導演台工作流.md)。
 
 搭配 AI 助理使用時：把劇情交給它拆成計畫檔，`import --dry-run` 檢查，匯入後在網頁看過，確認再 `gen … --yes`。
 

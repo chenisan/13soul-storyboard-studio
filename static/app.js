@@ -285,6 +285,8 @@ function renderEditor() {
     <div id="rewriteBox"></div>
   </div>
 
+  <div class="card" data-sec="notes" data-title="備註給 Claude"><div id="notesBox"></div></div>
+
   <div class="card" data-sec="bind" data-title="角色與場景">
     <div class="field"><span>出場角色（可多選）</span><div class="chips">${p.characters.map(c =>
       chip(s.chars?.includes(c.id), `data-char="${esc(c.id)}"`, `<img src="${fileUrl(c.image)}">${esc(c.name)}`)).join("") || '<span class="muted">左側先上傳角色卡</span>'}</div></div>
@@ -356,9 +358,39 @@ function renderEditor() {
   refreshDerived();
   renderVersions();
   renderSeedance(s);
+  renderNotes(s);
   decorateSections();
   if (st.view === "3d") mountStage();
   renderRewrite();
+}
+
+// ---------------- 備註給 Claude：在網頁上邊看邊寫，之後請 Claude 用 studio.mjs notes 讀取處理 ----------------
+const openNotes = s => (s?.notes || []).filter(n => n.status !== "done");
+const newReplies = s => (s?.notes || []).filter(n => n.status === "done" && n.reply && !n.ack).length;  // Claude 回覆了、使用者還沒看
+const nowText = () => new Date().toLocaleString("zh-TW", { hour12: false });
+
+function renderNotes(s) {
+  const box = $("#notesBox"); if (!box || !s) return;
+  const notes = s.notes || [];
+  const open = openNotes(s), done = notes.filter(n => n.status === "done");
+  const row = n => `<div class="note ${n.status === "done" ? "done" : ""}"><span class="note-id">#${esc(n.id)}</span>
+    <div class="note-body">${esc(n.text)}<div class="muted">${n.by === "claude" ? "Claude 留言・" : ""}${esc(n.created || "")}</div>
+      ${n.reply ? `<div class="note-reply">↳ ${esc(n.reply)}<span class="muted">　${esc(n.done_at || "")}</span>${!n.ack ? ` <button class="small ghost" data-noteack="${esc(n.id)}">知道了</button>` : ""}</div>` : ""}</div>
+    ${n.status === "done" ? `<button class="small ghost" data-notereopen="${esc(n.id)}">重開</button>` : `<button class="small ghost" data-notedone="${esc(n.id)}">✓ 完成</button>`}
+    <button class="small ghost" data-notedel="${esc(n.id)}" title="刪除">✕</button></div>`;
+  box.innerHTML = `${open.map(row).join("") || '<div class="muted">沒有待處理的備註。</div>'}
+    <div class="note-new"><textarea id="noteNew" rows="2" placeholder="例：表情太僵，改成微笑；角度再低一點（Ctrl+Enter 新增）"></textarea>
+      <button id="noteAdd">新增備註</button></div>
+    <div class="muted">寫完跟 Claude 說「處理備註」，它會讀取所有待處理的備註、修改分鏡，再標記完成並回覆。</div>
+    ${done.length ? `<details class="note-done" ${done.some(n => n.reply && !n.ack) ? "open" : ""}><summary>已處理 ${done.length} 則${newReplies(s) ? `（${newReplies(s)} 則新回覆）` : ""}</summary>${done.map(row).join("")}</details>` : ""}`;
+}
+
+function addNote(s) {
+  const text = $("#noteNew").value.trim(); if (!text) return;
+  s.notes ??= [];
+  const n = Math.max(0, ...s.notes.map(x => parseInt(String(x.id).replace(/\D/g, ""), 10) || 0)) + 1;
+  s.notes.push({ id: `n${n}`, text, created: nowText(), status: "open", by: "user" });
+  save(); renderNotes(s); updateSummaries(); renderStrip();
 }
 
 // ---------------- 可收合的區塊（像手機設定頁：標題列＋一行摘要） ----------------
@@ -393,6 +425,8 @@ function updateSummaries() {
     check: ws.length ? `${ws.filter(w => w.level === "error").length} 個錯誤、${ws.filter(w => w.level === "warn").length} 個警告` : "沒有問題",
     prompt: `${{ still: "首幀", video: "影片", mj: "Midjourney" }[st.tab]}${s.manual?.[st.tab] ? "（已手改）" : "（自動）"}${p.lang === "zh" ? "・中文" : ""}`,
     versions: cur ? `現行 v${cur.v}・${{ approved: "核可", rejected: "退回", check: "需核對" }[cur.review] || (cur.status === "done" ? "待核" : cur.status)}・共 ${g.versions.length} 版` : "還沒生成",
+    notes: (() => { const o = openNotes(s).length, d = (s.notes || []).length - o, r = newReplies(s);
+      return [o && `${o} 則待處理`, r && `${r} 則新回覆`].filter(Boolean).join("・") || (d ? `${d} 則已處理` : "沒有備註"); })(),
     seedance: `${s.previs?.path ? "有預演" : "沒有預演"}・${s.seedance?.prompt ? `提示詞 ${s.seedance.history?.length || 1} 版` : "還沒寫提示詞"}`,
   };
   for (const card of document.querySelectorAll("#editor .card[data-sec]")) {
@@ -414,7 +448,8 @@ function renderStripBar() {
   const bar = $("#stripBar"); if (!bar) return;
   const off = localGet("studio.stripCollapsed") === "1";
   document.querySelector("footer.strip").classList.toggle("collapsed", off);
-  bar.innerHTML = `<span class="chev">${off ? "▸" : "▾"}</span><b>分鏡列</b><span class="sec-sum">${st.project?.shots.length || 0} 顆${st.cur ? `｜目前 ${esc(st.cur)}` : ""}</span>`;
+  const pending = (st.project?.shots || []).reduce((n, s) => n + openNotes(s).length, 0);
+  bar.innerHTML = `<span class="chev">${off ? "▸" : "▾"}</span><b>分鏡列</b><span class="sec-sum">${st.project?.shots.length || 0} 顆${st.cur ? `｜目前 ${esc(st.cur)}` : ""}${pending ? `｜待處理備註 ${pending} 則` : ""}</span>`;
 }
 
 // ---------------- 影片（Seedance 2.5）：預演影片、AI 撰寫提示詞、打包上傳素材 ----------------
@@ -1132,7 +1167,7 @@ function renderStrip() {
     const g = st.gens[s.id], v = g?.versions.find(x => x.v === g.current);
     const errs = checkShot(s, p).filter(w => w.level === "error").length;
     return `<div class="shot ${s.id === st.cur ? "on" : ""}" data-shot="${esc(s.id)}">
-      <div class="th">${v?.file ? `<img src="${fileUrl(v.file)}">` : (s.z ? `${esc(s.z)}·${esc(s.y || "?")}` : "—")}${activeJobs(s.id).length ? '<div class="th-busy"><div class="spin"></div></div>' : ""}${s.previs?.path ? '<span class="th-tag">預演</span>' : ""}${s.seedance?.prompt ? '<span class="th-tag sd">SD</span>' : ""}</div>
+      <div class="th">${v?.file ? `<img src="${fileUrl(v.file)}">` : (s.z ? `${esc(s.z)}·${esc(s.y || "?")}` : "—")}${activeJobs(s.id).length ? '<div class="th-busy"><div class="spin"></div></div>' : ""}${s.previs?.path ? '<span class="th-tag">預演</span>' : ""}${s.seedance?.prompt ? '<span class="th-tag sd">SD</span>' : ""}${openNotes(s).length ? `<span class="th-tag note">✎${openNotes(s).length}</span>` : newReplies(s) ? '<span class="th-tag note reply">↳ 回覆</span>' : ""}</div>
       <div class="id">${esc(s.id)} ${errs ? '<span class="badge err">!</span>' : ""} ${esc(s.title || "")}</div>
       <div class="cd">${esc(codeLine(s, p) || "未設定")}</div></div>`;
   }).join("") + `<div class="shot add" id="addShot" title="新增分鏡">＋</div>`;
@@ -1310,6 +1345,18 @@ document.addEventListener("click", e => {
     toast("已套用改寫");
     return;
   }
+  if (t.id === "noteAdd") { addNote(s); return; }
+  const na = t.closest("[data-noteack]");
+  if (na) { const n = (s.notes || []).find(x => x.id === na.dataset.noteack); if (n) { n.ack = true; save(); renderNotes(s); updateSummaries(); renderStrip(); } return; }
+  const nd = t.closest("[data-notedone],[data-notereopen],[data-notedel]");
+  if (nd) {
+    const id = nd.dataset.notedone || nd.dataset.notereopen || nd.dataset.notedel;
+    const n = (s.notes || []).find(x => x.id === id); if (!n) return;
+    if (nd.dataset.notedel) { if (!confirm(`刪除備註 #${id}？`)) return; s.notes = s.notes.filter(x => x !== n); }
+    else if (nd.dataset.notedone) Object.assign(n, { status: "done", done_at: nowText() });
+    else n.status = "open";
+    save(); renderNotes(s); updateSummaries(); renderStrip(); return;
+  }
   if (t.id === "sdGen") { sdGenerate(s); return; }
   if (t.id === "sdPack") { sdPack(s); return; }
   if (t.id === "sdCopy") { navigator.clipboard.writeText($("#sdPrompt").value).then(() => toast("已複製 Seedance 提示詞")); return; }
@@ -1447,7 +1494,16 @@ $("#dlg").addEventListener("click", e => {
 // 角色卡／場景面板
 const assetPanel = $("#assetPanel");
 const setAssetPanel = open => { assetPanel.hidden = !open; $("#assetToggle").classList.toggle("on", open); };
-$("#assetToggle").onclick = e => { e.stopPropagation(); setAssetPanel(assetPanel.hidden); };
+$("#assetToggle").onclick = e => { e.stopPropagation(); setMenu(false); setAssetPanel(assetPanel.hidden); };
+
+// 漢堡選單：點項目後收起（項目自己的動作先執行），點外面或按 Esc 也收起
+const menuPanel = $("#menuPanel");
+const setMenu = open => { menuPanel.hidden = !open; $("#menuBtn").setAttribute("aria-expanded", String(open)); $("#menuBtn").classList.toggle("on", open); };
+$("#menuBtn").onclick = e => { e.stopPropagation(); setAssetPanel(false); setMenu(menuPanel.hidden); };
+menuPanel.addEventListener("click", e => { if (e.target.closest("button")) setMenu(false); });
+document.addEventListener("click", e => { if (!menuPanel.hidden && !menuPanel.contains(e.target) && e.target.id !== "menuBtn") setMenu(false); }, true);
+document.addEventListener("keydown", e => { if (e.key === "Escape") setMenu(false); });
+document.addEventListener("keydown", e => { if (e.target.id === "noteNew" && e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addNote(shot()); } });
 document.addEventListener("click", e => {
   // 點面板外面收起；面板開出來的編輯視窗、放大圖不算外面
   if (!assetPanel.hidden && !assetPanel.contains(e.target) && !e.target.closest("dialog") && e.target.id !== "assetToggle") setAssetPanel(false);

@@ -43,6 +43,31 @@ A local, browser-based storyboard tool for AI video: pick shots with X/Y/Z camer
 
 不需要 `pip install` 或 `npm install` 本專案的任何套件。
 
+### Codex 設定（生圖的關鍵）
+
+**需要什麼**
+- **ChatGPT 付費方案**（Plus、Pro、Team 等）。生圖用的是 ChatGPT 訂閱額度，不是 OpenAI API：不需要 API 金鑰，也不會產生 API 帳單，但會用掉訂閱的生圖額度。大量生成時可能遇到忙碌或額度限制。
+- **新版 Codex CLI**。生圖用的是 Codex 內建的 `image_gen` 工具，舊版可能沒有。已經裝過的話先更新：
+  ```
+  npm install -g @openai/codex@latest
+  codex login status      # 要看到 Logged in using ChatGPT
+  ```
+
+**運作方式**（不用另外設定）
+1. 本專案附了 `tools/codex_image_gen.py`；`.env` 的 `CODEX_IMAGE_GEN` 留空就用它。
+2. 按生成時，它用 `codex exec` 在背景開一個 Codex 工作階段，請它用 `image_gen` 依提示詞生圖；參考圖會一起交給它。
+3. 產生的圖存到專案的 `frames/`。如果 Codex 沒把圖存到指定位置，腳本會從 `~/.codex/generated_images` 抓最新一張補上，並在紀錄裡標 `fallback:`。
+   因為這個機制，**兩張同時生成會抓錯圖**。設計台用單一佇列一次只跑一張；不要另外同時跑其他 Codex 生圖。
+4. 「依選項改寫」也用同一個 Codex 登入，以唯讀模式在暫存資料夾執行。
+
+**先單獨測一次**：在本資料夾執行下面的指令，1–2 分鐘後 `test_output/` 出現圖片，就表示 Codex 這端正常。
+
+```
+python tools/codex_image_gen.py "a red apple on a wooden table" --out test_output
+```
+
+**用自己的生圖腳本**：在 `.env` 設 `CODEX_IMAGE_GEN=腳本路徑`。參數格式要和附的腳本相同：`"<提示詞>" --ratio square|reel|youtube --out <資料夾> --filename <檔名> --ref <參考圖>…`。
+
 ### 常見問題
 
 | 狀況 | 處理 |
@@ -50,6 +75,10 @@ A local, browser-based storyboard tool for AI video: pick shots with X/Y/Z camer
 | 網頁打不開、連不到 | 確認 `start.bat` 開出的最小化視窗還在；或在本資料夾執行 `python run.py` 看錯誤訊息 |
 | 生成失敗，紀錄寫 `No authentication found` | Codex 沒登入，重新執行 `codex login` |
 | 生成失敗，紀錄寫 `Selected model is at capacity` | ChatGPT 忙碌，稍後再按一次生成 |
+| 生成失敗，紀錄裡沒有用到 `image_gen` | Codex 版本太舊，執行 `npm install -g @openai/codex@latest` |
+| Windows 找不到 `codex` 指令 | 確認 npm 的全域資料夾（通常是 `%APPDATA%\npm`）在 PATH 裡；腳本會自動找 `codex.cmd` |
+| 生成很慢 | 正常，一張約 1–1.5 分鐘；多張會依序排隊 |
+| 圖和這顆分鏡對不上 | 紀錄出現 `fallback:` 的版本會標「需核對」，通常是同時有別的 Codex 在生圖 |
 | 埠號 8790 被占用 | 在 `.env` 改 `STUDIO_PORT`，例如 `8791` |
 | 改了 `.env` 沒生效 | 關掉伺服器視窗再重新啟動 |
 

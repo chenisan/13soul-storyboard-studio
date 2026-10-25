@@ -200,3 +200,10 @@ figure.sample img, figure.sample .ph { width: 100%; aspect-ratio: 16/9; object-f
 figure.sample figcaption { font-size: 12px; margin-top: 2px; }
 .pair-warn details summary { cursor: pointer; font-size: 12px; color: var(--warn); }
 .pair-warn details .pair-warn { margin-top: 4px; }
+
+/* Midjourney */
+.mj-box { margin-top: 8px; padding: 10px; background: var(--panel2); border-left: 3px solid var(--info); border-radius: 4px; display: grid; gap: 8px; }
+.mj-refs { display: flex; gap: 12px; flex-wrap: wrap; }
+.mj-ref { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; }
+.mj-ref img { width: 120px; height: 68px; object-fit: cover; border-radius: 4px; cursor: zoom-in; }
+.mj-ow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12px; }

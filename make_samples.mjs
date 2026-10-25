@@ -11,7 +11,7 @@ import { buildPrompt, refsOf, codeLine } from "./static/camera.js";
 try { process.loadEnvFile(new URL(".env", import.meta.url)); } catch { /* 沒有 .env 就只用環境變數 */ }
 const E = process.env;
 const API = `http://127.0.0.1:${E.STUDIO_PORT || 8790}`;
-const NAME = "_範例";
+const NAME = E.SAMPLE_PROJECT || "_範例";  // 想保留多組範例時可以換名稱（需以「_」開頭才會排在選單最後）
 const SRC_PROJECT = E.SAMPLE_SOURCE_PROJECT || "";  // 選填：沿用這個專案的角色鎖定描述、質感與規則
 const CHAR = { image: E.SAMPLE_CHARACTER_IMAGE, name: E.SAMPLE_CHARACTER_NAME, name_en: E.SAMPLE_CHARACTER_NAME_EN, lock: E.SAMPLE_CHARACTER_LOCK || "" };
 const SCENE = { image: E.SAMPLE_SCENE_IMAGE, name: E.SAMPLE_SCENE_NAME, name_en: E.SAMPLE_SCENE_NAME_EN, desc: E.SAMPLE_SCENE_DESC || "" };

@@ -108,6 +108,22 @@ A local, browser-based storyboard tool for AI video: pick shots with X/Y/Z camer
 - 攝影設備可以在「專案設定」設預設，每顆分鏡再個別覆蓋。
 - 提示詞會同時寫設備名稱和光學特徵；3D 導演台依「片幅＋焦段」計算視角。
 
+## Midjourney（半自動）
+
+Midjourney 沒有開放的官方 API，服務條款也禁止自動化操作，所以這裡採半自動：程式組好提示詞、整理參考圖，你在 Midjourney 網頁生成，再把成圖拖回來。
+
+1. 提示詞區切到「Midjourney」分頁。
+   - 提示詞會照 Midjourney 的習慣寫：短關鍵字、鏡頭放最前面。
+   - 自動加上 `--ar`（依專案畫幅）、`--v 7`、`--style raw`、`--ow`、`--no`。
+   - 按「複製」貼到 Midjourney。
+2. 下方列出每張參考圖該放的位置：主體角色卡放 **Omni Reference**（鎖定外觀，一次只能一張），場景和其他圖放 **Image Prompt**。
+   - 「複製圖片」後到 Midjourney 按 Ctrl+V 貼上，或「在資料夾顯示」後直接拖過去。
+   - Omni 權重 `--ow` 可以用滑桿調整：越高越像角色卡，太高會連姿勢、構圖都照抄。
+3. 生成後，把成圖從 Midjourney 網頁直接拖到「匯入區」，或拖下載好的檔案。成圖會成為這顆分鏡的新版本（標記 MJ），一樣可以比較、核可、刪除。
+   - 拖網頁圖片時，程式會下載該 https 網址；只接受 png／jpg／webp，30MB 以內。
+
+雙人鏡頭時，只有主體能用 Omni Reference 鎖定，另一個角色只能靠文字描述，外觀容易跑掉。
+
 ## 畫面內容與依選項改寫
 
 「畫面內容」是你自己寫的句子，會原樣放進提示詞的 `Action:`，選項不會自動改它。

@@ -319,7 +319,70 @@ function cameraZh(s, project, kind) {
 const FACE_VISIBLE = /[^.;,]*\b(face|eyes)\b[^.;,]*\b(visible|shown|seen|uncovered)\b[^.;,]*[.;,]?/gi;
 export const stripFaceVisible = text => (text || "").replace(FACE_VISIBLE, "").replace(/\s{2,}/g, " ").replace(/\s+([.;,])/g, "$1").trim();
 
+// ---------------- Midjourney ----------------
+// Midjourney 對短關鍵字反應比長句子好：鏡頭用專用的簡短寫法，參數放最後
+const MJ_Z = { Z1: "extreme close-up of the eyes", Z2: "close-up portrait, face filling the frame", Z3: "medium close-up, head and shoulders",
+  Z4: "waist-up medium shot", Z5: "medium shot from mid-thigh up", Z6: "three-quarter shot from the knees up", Z7: "full body shot, head to toe",
+  Z8: "long shot, small figure in the environment", Z9: "extreme long shot, tiny figure in a vast landscape" };
+const MJ_Y = { Y1: "worm's-eye view from the ground looking up", Y2: "low angle shot looking up", Y3: "slightly low angle", Y4: "eye level shot",
+  Y5: "slightly high angle", Y6: "high angle shot looking down", Y7: "top-down overhead view" };
+const MJ_X = { X1: "front view, facing the camera", X2: "three-quarter front view", X3: "side profile facing right", X4: "three-quarter back view, face turned away",
+  X5: "back view, facing away from the camera, face not visible", X6: "three-quarter back view, face turned away", X7: "side profile facing left", X8: "three-quarter front view" };
+const MJ_AR = { youtube: "16:9", reel: "9:16", square: "1:1" };
+
+// 參考圖在 Midjourney 的放法：主體角色卡 → Omni Reference（一次只能一張），其他 → Image Prompt
+export function midjourneyRefs(s, project) {
+  const refs = refsOf(s, project);
+  const subjCard = project.characters.find(c => c.id === (s.subject || (s.chars || [])[0]))?.image;
+  let omniUsed = false;
+  return refs.map(r => {
+    if (!omniUsed && r.path === subjCard) { omniUsed = true; return { ...r, role: "omni", roleZh: "Omni Reference（鎖定角色外觀）" }; }
+    return { ...r, role: "image", roleZh: r.label.startsWith("location") ? "Image Prompt（場景）" : "Image Prompt" };
+  });
+}
+
+export function buildMidjourney(s, project) {
+  const subjId = s.subject || (s.chars || [])[0];
+  const subj = subjId ? charNameEn(project, subjId) : "";
+  const away = s.x ? xOf(s.x).away : null;
+  const tight = s.z === "Z1" || s.z === "Z2";  // 特寫：服裝、身體描述會把畫面拉寬，不寫
+  // 「照參考圖保持臉部」這類是寫給 ChatGPT 的指示，Midjourney 由 Omni Reference 負責外觀，留著只是雜訊
+  const clean = t => (t || "").replace(/keep (exactly )?the face from the reference:?/gi, "").replace(/ from the reference/gi, "").replace(/^[\s,;:]+/, "").trim();
+  const parts = [];
+  if (s.z) parts.push(MJ_Z[s.z]);
+  if (s.y) parts.push(MJ_Y[s.y]);
+  if (s.x) parts.push(MJ_X[s.x]);
+  const r = s.r || "single";
+  if (r === "single") parts.push("solo, only one person");
+  else if (r === "ots") parts.push("over-the-shoulder shot");
+  else parts.push(rOf(r).en);
+  for (const id of s.chars || []) {
+    const c = project.characters.find(c => c.id === id);
+    if (!c) continue;
+    const lock = clean(away ? stripFaceVisible(c.lock) : c.lock);
+    parts.push(tight ? nameEn(c) : [nameEn(c), lock, clean(c.outfit)].filter(x => x?.trim()).join(", "));
+  }
+  if (s.action?.trim()) parts.push(s.action.trim().replace(/\.$/, ""));
+  const sc = project.scenes.find(x => x.id === s.scene);
+  if (sc) parts.push(tight || !sc.desc?.trim() ? `in ${nameEn(sc)}` : sc.desc.trim());
+  for (const m of s.mods || []) if (MOD_BY_ID[m]) parts.push(MOD_BY_ID[m].still);
+  const gear = gearOf(s, project);
+  if (gear.body || gear.lens || gear.focal) parts.push(`shot on ${[gear.body?.name, gear.lens?.name, gear.focal && `${gear.focal}mm`].filter(Boolean).join(" ")}`);
+  if (gear.stock) parts.push(gear.stock.name.replace(/（.*?）/, ""), "film grain");
+  if (project.look?.trim()) parts.push(project.look.trim().replace(/\.$/, ""));
+  const roles = midjourneyRefs(s, project);
+  const params = [`--ar ${MJ_AR[project.ratio] || "16:9"}`, "--v 7", "--style raw"];
+  if (roles.some(x => x.role === "omni")) params.push(`--ow ${s.mjOw || 100}`);
+  params.push(`--no text, logo, watermark${r === "single" ? ", extra people" : ""}`);
+  const text = parts.filter(Boolean).join(", ").replace(/\s+/g, " ") + " " + params.join(" ");
+  const zh = ["在 Midjourney 網頁：① 貼上提示詞 ② 把參考圖放到標示的位置 ③ 生成後把成圖拖回設計台。",
+    ...roles.map((x, i) => `參考圖 ${i + 1}：${x.labelZh} → ${x.roleZh}`),
+    (s.chars || []).length > 1 ? "注意：Omni Reference 一次只能放一張，只鎖定主體；其他角色只能靠文字描述，外觀可能跑掉。" : ""].filter(Boolean).join("\n");
+  return { en: text, zh, refs: roles.map(({ role, roleZh, ...r }) => r), roles };
+}
+
 export function buildPrompt(s, project, kind = "still") {
+  if (kind === "mj") return buildMidjourney(s, project);
   const refs = refsOf(s, project);
   const en = [], zh = [];
   const away = s.x ? xOf(s.x).away : null;  // back／profile：臉不朝鏡頭

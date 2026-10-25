@@ -1,4 +1,4 @@
-import { BODIES, LENSES, FOCALS, STOCKS, gearOf, migrateShotGear } from "./camera.js";
+import { BODIES, LENSES, FOCALS, STOCKS, gearOf, migrateShotGear, midjourneyRefs } from "./camera.js";
 import { X, Y, Z, R, M, MODS, zOf, rOf, codeLine, checkShot, checkPair, buildPrompt, refsOf, wordDiff, charNameEn } from "./camera.js";
 import { Stage, POSES, colorOf, colorName } from "./stage3d.js";
 import { checkPair3d, DEFAULT_HEIGHT } from "./stagemath.js";
@@ -292,6 +292,7 @@ function renderEditor() {
     <div class="tabs">
       <button class="${st.tab === "still" ? "on" : ""}" data-tab="still">首幀提示詞（送 codex）</button>
       <button class="${st.tab === "video" ? "on" : ""}" data-tab="video">影片提示詞（Seedance）</button>
+      <button class="${st.tab === "mj" ? "on" : ""}" data-tab="mj">Midjourney</button>
       <span id="manualBadge"></span><span class="grow"></span>
       <button class="ghost small" id="toggleDiff">看差異</button>
       <button class="ghost small" id="resetPrompt">還原成自動版</button>
@@ -301,8 +302,9 @@ function renderEditor() {
     <div class="refs" id="refs"></div>
     <textarea class="prompt-en" id="promptEn" spellcheck="false"></textarea>
     <div id="diffBox"></div>
+    <div id="mjBox"></div>
     <div class="field" style="margin-top:6px"><span>中文對照（唯讀）</span><textarea class="prompt-zh" id="promptZh" readonly></textarea></div>
-    <div class="row" style="margin-top:8px;align-items:center">
+    <div class="row" id="genRow" style="margin-top:8px;align-items:center">
       <button id="genBtn">生成首幀…</button>
       <span class="muted">比例：${RATIO_ZH[p.ratio] || p.ratio}（在「專案設定」改）。生成前會再讓你確認提示詞。</span>
     </div>
@@ -529,6 +531,7 @@ function gearSelect(kind, list, value, defId, label) {
 function gearHtml(s) {
   const p = st.project, g = s.gear || {}, d = p.gear || {}, eff = gearOf(s, p);
   return `<div class="field" style="margin-top:8px"><span>攝影設備（留「專案預設」就跟著專案設定走）</span>
+    <span class="muted">實測：生圖模型對鏡頭品牌、數位機身、焦段的差異反應有限；黑白底片、變形鏡的橫向光斑比較明顯。滑鼠停在選項上可看範例。</span>
     <div class="row" style="gap:10px">${gearSelect("body", BODIES, g.body, d.body, "機身")}${gearSelect("lens", LENSES, g.lens, d.lens, "鏡頭")}
     ${eff.body?.film ? gearSelect("stock", STOCKS, g.stock, d.stock, "底片") : ""}</div>
     <div class="mod-group" style="margin-top:6px"><b>焦段</b><div class="chips">${FOCALS.map(f =>
@@ -659,6 +662,66 @@ function refreshDerived() {
   if (!$("#refs").contains(document.activeElement)) renderRefs(s);
   $("#diffBox").innerHTML = st.showDiff && man ? `<div class="muted" style="margin-top:6px">差異（綠＝手改新增，紅＝自動版有但被刪掉）</div><div class="diff">${wordDiff(auto.en, man.text).map(d => d.t === "same" ? esc(d.s) : `<span class="${d.t}">${esc(d.s)}</span>`).join("")}</div>` : "";
   $("#genBtn").disabled = !s.z || !s.y;
+  $("#genRow").hidden = kind === "mj";
+  if (kind === "mj") { if (!$("#mjBox").contains(document.activeElement)) renderMj(s); } else $("#mjBox").innerHTML = "";
+}
+
+// ---------------- Midjourney（半自動：複製提示詞與參考圖，成圖拖回來） ----------------
+function renderMj(s) {
+  const roles = midjourneyRefs(s, st.project);
+  const omni = roles.some(r => r.role === "omni");
+  const box = $("#mjBox");
+  box.innerHTML = `<div class="mj-box">
+    <div class="muted">在 Midjourney 網頁：① 按上方「複製」，貼上提示詞　② 把下面的圖放到標示的位置（「複製圖片」後在 Midjourney 按 Ctrl+V，或「在資料夾顯示」後拖過去）　③ 生成後把成圖拖回下方。</div>
+    <div class="mj-refs">${roles.map(r => `<div class="mj-ref"><img src="${fileUrl(r.path)}" data-zoom="${esc(r.path)}">
+      <div><b>${esc(r.roleZh)}</b><br><span class="muted">${esc(r.labelZh)}</span><br>
+      <button class="small ghost" data-mjcopy="${esc(r.path)}">複製圖片</button> <button class="small ghost" data-mjreveal="${esc(r.path)}">在資料夾顯示</button></div></div>`).join("") || '<span class="muted">沒有參考圖</span>'}</div>
+    ${omni ? `<label class="mj-ow">Omni 權重 --ow <input type="range" id="mjOw" min="10" max="1000" step="10" value="${s.mjOw || 100}"> <b>${s.mjOw || 100}</b>
+      <span class="muted">越高越像角色卡；太高連姿勢、構圖都會照抄角色卡</span></label>` : ""}
+    ${(s.chars || []).length > 1 ? '<div class="w warn">Omni Reference 一次只能放一張，只鎖定主體；其他角色只能靠文字描述，外觀可能跑掉。</div>' : ""}
+    <div class="drop" id="mjDrop">把 Midjourney 成圖拖到這裡（可直接從 Midjourney 網頁拖，或拖下載好的檔案），
+      或 <label class="btn small">選擇檔案<input type="file" accept="image/*" hidden id="mjFile"></label></div></div>`;
+  const drop = $("#mjDrop");
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = e => {
+    e.preventDefault(); drop.classList.remove("over");
+    const file = e.dataTransfer.files[0];
+    const html = e.dataTransfer.getData("text/html");
+    const url = e.dataTransfer.getData("text/uri-list").split("\n").find(l => l && !l.startsWith("#"))
+      || html.match(/<img[^>]+src="([^"]+)"/i)?.[1] || e.dataTransfer.getData("text/plain");
+    if (file) importMj(s, { file }); else if (url?.startsWith("http")) importMj(s, { url: url.trim() });
+    else toast("沒有讀到圖片；請改用下載好的檔案拖進來");
+  };
+  $("#mjFile").onchange = e => { if (e.target.files[0]) importMj(s, { file: e.target.files[0] }); };
+}
+
+const fileToB64 = file => new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1]); r.onerror = fail; r.readAsDataURL(file); });
+
+async function importMj(s, { file, url }) {
+  const p = st.project;
+  const body = { shot_id: s.id, prompt: currentText(s, "mj"), code: codeLine(s, p) + "（Midjourney）", refs: refsOf(s, p).map(r => r.path), ratio: p.ratio, source: "midjourney" };
+  try {
+    if (file) body.image_b64 = await fileToB64(file); else body.url = url;
+    toast("匯入中…");
+    const { v } = await api(`/api/gens/import?${q()}`, { method: "POST", body: JSON.stringify(body) });
+    st.justDone = `${s.id}:${v}`; st.scrollHero = true;
+    await refreshGens(true);
+    toast(`已匯入為 ${s.id} v${v}（Midjourney）`);
+  } catch (e) { toast("匯入失敗：" + e.message); }
+}
+
+async function copyImage(path) {
+  try {
+    let blob = await (await fetch(fileUrl(path))).blob();
+    if (blob.type !== "image/png") {  // 剪貼簿只收 png
+      const bmp = await createImageBitmap(blob), c = document.createElement("canvas");
+      c.width = bmp.width; c.height = bmp.height; c.getContext("2d").drawImage(bmp, 0, 0);
+      blob = await new Promise(r => c.toBlob(r, "image/png"));
+    }
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    toast("已複製圖片，到 Midjourney 按 Ctrl+V 貼上");
+  } catch (e) { toast("複製失敗：" + e.message); }
 }
 
 function onPromptInput(e) {
@@ -720,7 +783,7 @@ function renderVersions() {
     const canDel = v.status === "done" || v.status === "failed";
     return `<div class="ver ${g.current === v.v ? "cur" : ""}" data-v="${v.v}">${canDel ? `<button class="ver-del" data-delv="${v.v}" title="刪除這一版">✕</button>` : ""}<div class="ph">${ph}</div>
       <div class="meta"><b>v${v.v}</b>${g.current === v.v ? '<span class="badge ok">現行</span>' : ""}${reviewBadge(v)}
-      ${v.manual ? '<span class="badge dim">手改</span>' : ""}<span class="muted">${esc(v.finished || v.created || "")}</span></div></div>`;
+      ${v.source === "midjourney" ? '<span class="badge dim">MJ</span>' : ""}${v.manual ? '<span class="badge dim">手改</span>' : ""}<span class="muted">${esc(v.finished || v.created || "")}</span></div></div>`;
   }).join("") + `</div>` + (vers.length ? "" : '<span class="muted">還沒生成過。</span>');
   const failed = vers.filter(v => v.status === "failed").map(v => v.v);
   const tools = $("#verTools");
@@ -767,8 +830,9 @@ function openVersion(vn) {
     }
     if (act === "edit") {
       s.manual ??= {};
-      s.manual.still = { text: v.prompt, base: autoPrompt(s, "still").en };
-      st.tab = "still"; save(); renderEditor(); toast("已載入這版提示詞，可以修改後再生成");
+      const k = v.source === "midjourney" ? "mj" : "still";  // Midjourney 版本回到 Midjourney 分頁改
+      s.manual[k] = { text: v.prompt, base: autoPrompt(s, k).en };
+      st.tab = k; save(); renderEditor(); toast("已載入這版提示詞，可以修改後再生成");
       return true;
     }
     if (act === "delete") {
@@ -900,7 +964,8 @@ async function refreshGens(force) {
     const active = st.queue.filter(j => j.state === "queued" || j.state === "running");
     const run = active.find(j => j.state === "running");
     $("#queueInfo").innerHTML = active.length ? `<span class="spin tiny"></span> 生成中：${run ? `${esc(run.shot_id)} v${run.v}（<span data-start="${startOf(run)}">${mmss(Date.now() - startOf(run))}</span>，${esc(run.tail || "")}）` : "—"}　等待 ${active.length - (run ? 1 : 0)}` : "";
-    if (force || st.queue.some(j => j.state === "queued" || j.state === "running") || st._hadQueue) {
+    st.pollTick = (st.pollTick || 0) + 1;  // 每 10 秒也讀一次：別的分頁或程式匯入的版本也會出現
+    if (force || st.queue.some(j => j.state === "queued" || j.state === "running") || st._hadQueue || st.pollTick % 5 === 0) {
       st.gens = await api(`/api/gens?${q()}`);
       renderVersions(); renderStrip();
     }
@@ -1005,6 +1070,10 @@ document.addEventListener("click", e => {
     toast("已套用改寫");
     return;
   }
+  const mc = t.closest("[data-mjcopy]");
+  if (mc) { copyImage(mc.dataset.mjcopy); return; }
+  const mr = t.closest("[data-mjreveal]");
+  if (mr) { api(`/api/reveal?${q()}`, { method: "POST", body: JSON.stringify({ path: mr.dataset.mjreveal }) }).catch(err => toast(err.message)); return; }
   const rx = t.closest("[data-refx]");
   if (rx) { toggleRef(s, rx.dataset.refx); return; }
   if (t.closest("#refAdd")) { openAddRef(); return; }
@@ -1068,6 +1137,7 @@ document.addEventListener("input", e => {
   if (e.target.id === "fTitle") { s.title = e.target.value; save(); renderStrip(); }
   else if (e.target.id === "fAction") { s.action = e.target.value; save(); refreshDerived(); renderStrip(); }
   else if (e.target.id === "promptEn") onPromptInput(e);
+  else if (e.target.id === "mjOw") { s.mjOw = +e.target.value; e.target.nextElementSibling.textContent = e.target.value; save(); refreshDerived(); }
   else if (e.target.dataset?.refnote) {
     const r = (s.refs || []).find(x => x.id === e.target.dataset.refnote);
     if (r) { r.note = e.target.value; save(); refreshDerived(); }

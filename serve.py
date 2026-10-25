@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import mimetypes
 import os
@@ -26,6 +27,7 @@ import tempfile
 import threading
 import time
 import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -225,6 +227,60 @@ def rewrite_action(body: dict) -> str:
     return text.strip().strip('"“”「」').strip()
 
 
+# ---------------- 匯入外部生成的圖（Midjourney 等） ----------------
+IMPORT_MAX = 30 * 1024 * 1024
+IMG_SIG = {b"\x89PNG": ".png", b"\xff\xd8\xff": ".jpg", b"RIFF": ".webp"}
+
+
+def image_ext(data: bytes) -> str | None:
+    """依檔頭判斷圖片格式，不是 png／jpg／webp 就回傳 None"""
+    for sig, ext in IMG_SIG.items():
+        if data.startswith(sig) and (ext != ".webp" or data[8:12] == b"WEBP"):
+            return ext
+    return None
+
+
+def fetch_image(url: str) -> bytes:
+    """下載 https 圖片網址（例如 Midjourney 成圖的 CDN），限 30MB"""
+    if not url.lower().startswith("https://"):
+        raise ValueError("只接受 https 圖片網址")
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 storyboard-studio"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        data = r.read(IMPORT_MAX + 1)
+    if len(data) > IMPORT_MAX:
+        raise ValueError("圖片超過 30MB")
+    return data
+
+
+def import_version(p: str, body: dict) -> dict:
+    """把外部工具生成的圖存成這顆分鏡的新版本（設為現行版）"""
+    sid = safe_name(body["shot_id"])
+    data = fetch_image(body["url"]) if body.get("url") else base64.b64decode(body.get("image_b64", ""))
+    if len(data) > IMPORT_MAX:
+        raise ValueError("圖片超過 30MB")
+    ext = image_ext(data)
+    if not ext:
+        raise ValueError("不是 png／jpg／webp 圖片")
+    pdir = project_dir(p)
+    with lock:
+        g = read_json(gens_path(p), {})
+        entry = g.setdefault(sid, {"versions": [], "current": None})
+        v = max([x["v"] for x in entry["versions"]], default=0) + 1
+        rel = f"frames/{sid}_v{v}{ext}"
+        (pdir / "frames").mkdir(parents=True, exist_ok=True)
+        (pdir / rel).write_bytes(data)
+        now = time.strftime("%Y-%m-%d %H:%M:%S")
+        entry["versions"].append({
+            "v": v, "status": "done", "review": "pending", "file": rel, "flag": None,
+            "source": body.get("source", "midjourney"), "prompt": body.get("prompt", ""), "prompt_zh": "",
+            "code": body.get("code", ""), "refs": [r for r in body.get("refs", []) if inside(pdir, r)],
+            "ratio": body.get("ratio", ""), "manual": False, "created": now, "finished": now,
+        })
+        entry["current"] = v
+        write_json(gens_path(p), g)
+    return {"v": v, "file": rel}
+
+
 def enqueue(p: str, body: dict) -> dict:
     sid = body["shot_id"]
     pdir = project_dir(p)
@@ -405,6 +461,20 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json({"text": rewrite_action(json.loads(self.body()))})
                 except subprocess.TimeoutExpired:
                     return self.send_json({"error": "codex 超過 3 分鐘沒有回應"}, 504)
+            if path == "/api/gens/import":  # Midjourney 等外部成圖：{shot_id, image_b64 或 url, prompt, refs, code}
+                try:
+                    return self.send_json(import_version(q["p"], json.loads(self.body())))
+                except (ValueError, OSError) as e:
+                    return self.send_json({"error": str(e)}, 400)
+            if path == "/api/reveal":  # 在檔案總管選取專案內的檔案（方便拖到 Midjourney 網頁）
+                b = json.loads(self.body())
+                f = inside(project_dir(q["p"]), b.get("path", ""))
+                if not f or not f.is_file():
+                    return self.send_json({"error": "找不到檔案"}, 404)
+                if os.name != "nt":
+                    return self.send_json({"error": "只支援 Windows"}, 400)
+                subprocess.Popen(["explorer", "/select,", str(f)])
+                return self.send_json({"ok": True})
             if path == "/api/generate":
                 if not GEN_PY.exists():
                     return self.send_json({"error": f"找不到 {GEN_PY}"}, 500)

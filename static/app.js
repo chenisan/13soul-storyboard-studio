@@ -418,6 +418,9 @@ const ICONS = {
   copy: '<rect x="8" y="8" width="12" height="12" rx="1"/><path d="M16 8V4H4v12h4"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   back: '<path d="M15 6l-6 6 6 6"/>',
+  zoom: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M11 8.5v5M8.5 11h5"/>',
+  next: '<path d="M9 6l6 6-6 6"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
 };
 const icon = name => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`;
 // 靜態頁面上標了 data-icon 的按鈕補上圖示（漢堡選單等）
@@ -747,7 +750,7 @@ async function loadSamples() {
     for (const s of p.shots) {
       const e = g[s.id], cur = e?.versions?.find(v => v.v === e.current && v.file);
       const last = e?.versions?.at(-1);
-      for (const [axis, val] of s.sample || []) map[`${axis}:${val}`] = { file: cur?.file, status: cur ? "done" : last?.status || "none", shot: s.id };
+      for (const [axis, val] of s.sample || []) map[`${axis}:${val}`] = { file: cur?.file, status: cur ? "done" : last?.status || "none", shot: s.id, code: codeLine(s, p) };
     }
     st.samples = map;
     st.sampleTitle = [p.characters[0]?.name, p.scenes[0]?.name].filter(Boolean).join("・");
@@ -788,14 +791,14 @@ function samplesHtml() {
   const s = shot();
   const card = ([val, label], axis) => {
     const smp = st.samples[`${axis}:${val}`];
-    const ph = smp?.file ? `<img src="${sampleUrl(smp.file)}"><a class="sample-open" href="${sampleUrl(smp.file)}" target="_blank" title="開原圖">↗</a>`
+    const ph = smp?.file ? `<img src="${sampleUrl(smp.file)}"><button type="button" class="sample-zoom" data-zoomsample="${axis}:${esc(val)}" title="放大看" aria-label="放大看">${icon("zoom")}</button>`
       : `<div class="ph">${smp?.status === "running" ? '<span class="spin tiny"></span> 生成中' : smp?.status === "queued" ? "排隊中" : smp?.status === "failed" ? "生成失敗" : "尚未生成"}</div>`;
     const on = s && sampleSelected(s, axis, val);
     return `<figure class="sample ${on ? "on" : ""}" data-apply="${axis}:${esc(val)}" title="${s ? `套用到 ${esc(s.id)}` : ""}">${ph}<figcaption>${esc(label)}${on ? '　<span class="badge ok">目前</span>' : ""}</figcaption></figure>`;
   };
   const done = Object.values(st.samples).filter(x => x.file).length;
   return `${st.sampleApplied?.length ? `<div class="sample-applied">已套用到 ${esc(s?.id || "")}：${st.sampleApplied.map(esc).join("、")}</div>` : ""}
-    <div class="muted">${s ? `可以連續點選：每組各選一個，點了馬上套用到 <b>${esc(s.id)}</b>，提示詞跟著改；同一組再點另一張就換掉。框起來的是目前的設定，選好按「完成」。` : "先選一顆分鏡，點圖就能套用設定。"}
+    <div class="muted">${s ? `可以連續點選：每組各選一個，點了馬上套用到 <b>${esc(s.id)}</b>，提示詞跟著改；同一組再點另一張就換掉。框起來的是目前的設定；右上角放大鏡可以全螢幕看大圖。選好按「完成」。` : "先選一顆分鏡，點圖就能套用設定。"}
     同一個角色、同一個場景，每組只改一個變數（已完成 ${done} 格）。右上角 ↗ 開原圖。重新產生：<code>node make_samples.mjs all</code></div>
     ${SAMPLE_GROUPS.map(g => `<h4>${esc(g.title)}</h4><div class="sample-grid">${g.items.map(it => card(it, g.axis)).join("")}</div>`).join("")}`;
 }
@@ -825,6 +828,53 @@ function applySample(axis, val) {
   // 同一組只留最後選的那個
   st.sampleApplied = [...(st.sampleApplied || []).filter(x => !group?.items.some(([, l]) => l === x)), label];
   toast(`已套用「${label}」到 ${s.id}`);
+}
+
+// ---------------- 範例燈箱：全螢幕看大圖，同一組左右切換，可直接套用 ----------------
+let lightboxKeys = () => {};
+document.addEventListener("keydown", e => lightboxKeys(e));
+function openLightbox(key) {
+  const [axis] = key.split(":");
+  const group = SAMPLE_GROUPS.find(g => g.axis === axis);
+  const keys = group.items.map(([v]) => `${axis}:${v}`).filter(k => st.samples[k]?.file);  // 只列已經生好的
+  let i = Math.max(0, keys.indexOf(key));
+  const lb = $("#lightbox");
+  const render = () => {
+    const k = keys[i], [, val] = [k.split(":")[0], k.split(":").slice(1).join(":")];
+    const smp = st.samples[k], label = group.items.find(([v]) => v === val)?.[1] || val;
+    const s = shot(), on = s && sampleSelected(s, axis, val);
+    lb.innerHTML = `<div class="lb-top"><b>${esc(group.title)}</b><span class="muted">${i + 1}／${keys.length}</span><span class="grow"></span>
+        <button type="button" class="ghost small" data-lb="close">${icon("close")}關閉</button></div>
+      <div class="lb-stage">
+        <button type="button" class="lb-nav" data-lb="prev" aria-label="上一張">${icon("back")}</button>
+        <img src="${sampleUrl(smp.file)}" alt="${esc(label)}">
+        <button type="button" class="lb-nav" data-lb="next" aria-label="下一張">${icon("next")}</button></div>
+      <div class="lb-bar"><span class="tally ${on ? "ok" : ""}"></span><b>${esc(label)}</b><span class="muted lb-code">${esc(smp.code || "")}</span><span class="grow"></span>
+        <a class="btn ghost small" href="${sampleUrl(smp.file)}" target="_blank">原圖</a>
+        <button type="button" data-lb="apply" ${!s || on ? "disabled" : ""}>${on ? "目前已套用" : s ? `套用到 ${esc(s.id)}` : "先選一顆分鏡"}</button>
+        <span class="muted lb-keys">← → 切換　Enter 套用　Esc 關閉</span></div>`;
+  };
+  const go = d => { i = (i + d + keys.length) % keys.length; render(); };
+  const apply = () => { const [, ...v] = keys[i].split(":"); if (shot()) { applySample(axis, v.join(":")); render(); } };
+  lb.onclick = e => {
+    if (e.target === lb) return lb.close();  // 點外面
+    const a = e.target.closest("[data-lb]")?.dataset.lb;
+    if (a === "close") lb.close(); else if (a === "prev") go(-1); else if (a === "next") go(1); else if (a === "apply") apply();
+  };
+  // 每次切換會重畫燈箱、焦點會不見，所以按鍵改在整個頁面接收（燈箱開著才處理）
+  lightboxKeys = e => {
+    if (!lb.open) return;
+    if (e.key === "ArrowLeft") { e.preventDefault(); go(-1); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); go(1); }
+    else if (e.key === "Enter") { e.preventDefault(); apply(); }
+    else if (e.key === "Escape") { e.preventDefault(); lb.close(); }
+  };
+  lb.onclose = () => {  // 回到對照表時更新綠框
+    const body = $("#sampleBody"), dlg = $("#dlg"), top = dlg.scrollTop;
+    if (body && dlg.open) { body.innerHTML = samplesHtml(); dlg.scrollTop = top; }
+  };
+  render();
+  lb.showModal();
 }
 
 function openSamples() {
@@ -1549,7 +1599,8 @@ $("#projectSettings").onclick = projectSettings;
 $("#sampleBtn").onclick = async () => { await loadSamples(); openSamples(); };
 // 範例格點一下就套用（↗ 開原圖除外）
 $("#dlg").addEventListener("click", e => {
-  if (e.target.closest(".sample-open")) return;
+  const zb = e.target.closest("[data-zoomsample]");
+  if (zb) { openLightbox(zb.dataset.zoomsample); return; }
   const card = e.target.closest("[data-apply]");
   if (!card) return;
   const [axis, ...rest] = card.dataset.apply.split(":");

@@ -267,9 +267,18 @@ function renderEditor() {
   if (!s) { ed.innerHTML = `<div class="empty">下方按「＋」新增第一顆分鏡。</div>`; return; }
   const chip = (on, attrs, label) => `<span class="chip ${on ? "on" : ""}" ${attrs}>${label}</span>`;
 
-  ed.innerHTML = `
-  <div class="sec-tools"><span class="muted">${esc(s.id)} ${esc(s.title || "")}</span><span class="grow"></span>
-    <button class="small ghost" data-secall="open">全部展開</button><button class="small ghost" data-secall="close">全部收合</button></div>
+  ed.innerHTML = `<div class="desk">
+  <aside class="sheet">
+    <div class="sheet-id"><span class="sid">${esc(s.id)}</span><span class="tally" id="sheetTally"></span></div>
+    <div class="sheet-title" id="sheetTitle"></div>
+    <p class="sheet-action" id="sheetAction"></p>
+    <div class="codes" id="sheetCodes"></div>
+    <div class="code-line" id="codeLine"></div>
+    <div class="status" id="sheetStatus"></div>
+    <div class="warns" id="warns"></div>
+    <nav class="rows" id="sheetRows"></nav>
+  </aside>
+  <section class="work" id="work" data-show="${st.panel}">
   <div class="card" data-sec="basic" data-title="鏡頭內容">
     <div class="row">
       <label class="field" style="width:110px"><span>鏡號</span><input type="text" id="fId" value="${esc(s.id)}" disabled></label>
@@ -324,11 +333,6 @@ function renderEditor() {
     ${gearHtml(s)}
   </div>
 
-  <div class="card" data-sec="check" data-title="代碼與檢查">
-    <div class="code" id="codeLine"></div>
-    <div class="warns" id="warns"></div>
-  </div>
-
   <div class="card" data-sec="prompt" data-title="提示詞">
     <div class="tabs">
       <button class="${st.tab === "still" ? "on" : ""}" data-tab="still">首幀提示詞（送 codex）</button>
@@ -351,10 +355,14 @@ function renderEditor() {
     </div>
   </div>
 
-  <div class="card" data-sec="versions" data-title="生成版本"><div class="tabs"><span class="grow"></span><span id="verTools"></span></div>
-    <div class="versions" id="versions"></div></div>
+  <div class="card" data-sec="view" data-title="畫面與版本">
+    <div class="versions" id="versions"></div>
+    <div class="viewer-actions"><button id="viewGen">生成首幀…</button>
+      <button class="ghost" data-review="approved">核可</button><button class="ghost" data-review="rejected">退回</button>
+      <span class="grow"></span><span id="verTools"></span></div></div>
 
-  <div class="card" id="sdCard" data-sec="seedance" data-title="影片（Seedance 2.5）"></div>`;
+  <div class="card" id="sdCard" data-sec="seedance" data-title="影片（Seedance 2.5）"></div>
+  </section></div>`;
   refreshDerived();
   renderVersions();
   renderSeedance(s);
@@ -393,25 +401,38 @@ function addNote(s) {
   save(); renderNotes(s); updateSummaries(); renderStrip();
 }
 
-// ---------------- 可收合的區塊（像手機設定頁：標題列＋一行摘要） ----------------
-// 預設收合「角色與場景」「鏡頭座標」（使用者要求）；之後依使用者的操作記住
-const collapsed = new Set(JSON.parse(localGet("studio.collapsed") ?? '["bind", "camera"]'));
-const saveCollapsed = () => localSet("studio.collapsed", JSON.stringify([...collapsed]));
+// ---------------- 版面：左欄「鏡頭資料」選面板，右側工作區一次顯示一個（預設畫面與版本） ----------------
+const PANELS = [["view", "畫面與版本"], ["basic", "鏡頭內容"], ["notes", "備註給 Claude"], ["bind", "角色與場景"],
+  ["camera", "鏡頭座標"], ["prompt", "提示詞"], ["seedance", "影片（Seedance 2.5）"]];
+st.panel = PANELS.some(([k]) => k === localGet("studio.panel")) ? localGet("studio.panel") : "view";
 
-// 每張有 data-sec 的卡片頂端放一條可點的標題列；收合狀態記在瀏覽器
+// 編輯面板上方放「回到畫面」
 function decorateSections() {
   for (const card of document.querySelectorAll("#editor .card[data-sec]")) {
-    const key = card.dataset.sec;
-    if (!card.querySelector(":scope > .sec-bar")) {
-      card.insertAdjacentHTML("afterbegin", `<button type="button" class="sec-bar" data-sectoggle="${key}">
-        <span class="chev">▾</span><b>${esc(card.dataset.title)}</b><span class="sec-sum"></span></button>`);
-    }
-    card.classList.toggle("collapsed", collapsed.has(key));
+    if (card.dataset.sec === "view" || card.querySelector(":scope > .panel-head")) continue;
+    card.insertAdjacentHTML("afterbegin", `<div class="panel-head"><button type="button" class="ghost small" data-panel="view">← 回到畫面</button><b>${esc(card.dataset.title)}</b></div>`);
   }
   updateSummaries();
 }
 
-// 收合時看摘要就知道內容
+function setPanel(key) {
+  st.panel = key; localSet("studio.panel", key);
+  $("#work")?.setAttribute("data-show", key);  // 不能用 data-panel：會被點擊判斷當成切換按鈕
+  updateSummaries();
+  if (key === "camera" && st.view === "3d") st.stage?.resize();  // 3D 畫面顯示後重算大小
+  $("#work")?.scrollTo({ top: 0 });
+}
+
+// 狀態指示燈：綠＝核可、琥珀＝待核或生成中、紅＝退回或失敗、灰＝還沒有
+function shotTally(s) {
+  if (activeJobs(s.id).length) return "wait pulse";
+  const g = st.gens[s.id], cur = g?.versions?.find(v => v.v === g.current);
+  if (g?.versions?.at(-1)?.status === "failed" && !cur) return "live";
+  if (!cur) return "";
+  return { approved: "ok", rejected: "live" }[cur.review] || "wait";
+}
+
+// 左欄的資料、狀態與選單（也是各面板的摘要）
 function updateSummaries() {
   const s = shot(); if (!s || !st.project) return;
   const p = st.project, g = st.gens[s.id];
@@ -429,18 +450,23 @@ function updateSummaries() {
       return [o && `${o} 則待處理`, r && `${r} 則新回覆`].filter(Boolean).join("・") || (d ? `${d} 則已處理` : "沒有備註"); })(),
     seedance: `${s.previs?.path ? "有預演" : "沒有預演"}・${s.seedance?.prompt ? `提示詞 ${s.seedance.history?.length || 1} 版` : "還沒寫提示詞"}`,
   };
-  for (const card of document.querySelectorAll("#editor .card[data-sec]")) {
-    const el = card.querySelector(":scope > .sec-bar .sec-sum");
-    if (el) el.textContent = sum[card.dataset.sec] || "";
-  }
-}
-
-function toggleSection(key, open) {
-  open ??= collapsed.has(key);
-  open ? collapsed.delete(key) : collapsed.add(key);
-  saveCollapsed();
-  document.querySelector(`#editor .card[data-sec="${key}"]`)?.classList.toggle("collapsed", !open);
-  if (key === "camera" && open && st.view === "3d") st.stage?.resize();  // 3D 畫面展開後重算大小
+  sum.view = sum.versions;
+  const set = (id, html) => { const el = $(id); if (el) el.innerHTML = html; };
+  const gear = gearOf(s, p);
+  set("#sheetTitle", esc(s.title || "（未命名）"));
+  set("#sheetAction", esc(s.action || "還沒寫畫面內容"));
+  $("#sheetTally") && ($("#sheetTally").className = `tally ${shotTally(s)}`);
+  set("#sheetCodes", [[s.z, "景別"], [s.y, "俯仰"], [s.x, "方位"], [gear.focal, "焦段 mm"]]
+    .map(([v, k]) => `<div><b>${esc(v || "—")}</b><span>${k}</span></div>`).join(""));
+  const st1 = shotTally(s), o = openNotes(s).length, r = newReplies(s);
+  set("#sheetStatus", [
+    ["首幀", st1, cur ? `v${cur.v} ${{ approved: "已核可", rejected: "已退回" }[cur.review] || (cur.review === "check" ? "需核對" : "待核")}` : activeJobs(s.id).length ? "生成中" : "還沒生成"],
+    ["預演", s.previs?.path ? "ok" : "", s.previs?.path ? "有" : "沒有"],
+    ["Seedance", s.seedance?.prompt ? "ok" : "", s.seedance?.prompt ? `提示詞 ${s.seedance.history?.length || 1} 版` : "還沒寫"],
+    ["備註", o ? "wait" : r ? "ok" : "", o ? `${o} 則待處理` : r ? `${r} 則新回覆` : "沒有"],
+  ].map(([k, t, v]) => `<div><span class="k">${k}</span><span class="tally ${t}"></span>${esc(v)}</div>`).join(""));
+  set("#sheetRows", PANELS.map(([k, name]) => `<button type="button" class="srow ${st.panel === k ? "on" : ""}" data-panel="${k}">
+    <span class="name">${name}</span><span class="sum">${esc(sum[k] || "")}</span><span class="chev">›</span></button>`).join(""));
 }
 
 // 下方分鏡列也可以收合
@@ -1024,8 +1050,13 @@ function renderHero(s, g, vers) {
   const fresh = st.justDone === `${s.id}:${latest.v}`;
   let html = "";
   if (latest.status === "failed") html += `<div class="w error">v${latest.v} 生成失敗。<button class="small ghost" data-v="${latest.v}">看紀錄</button></div>`;
-  if (cur) html += `<figure class="hero ${fresh ? "fresh" : ""}" data-v="${cur.v}"><img src="${fileUrl(cur.file)}?t=${encodeURIComponent(cur.finished || "")}">
-    <figcaption><b>v${cur.v}</b> 現行 ${reviewBadge(cur)} ${fresh ? '<span class="badge ok">剛完成</span>' : ""}<span class="muted">${esc(cur.finished || "")}　點圖可核可／退回／看提示詞</span></figcaption></figure>`;
+  if (cur) {
+    const gr = gearOf(s, st.project);
+    const osd = [gr.body?.name, [gr.lens?.name, gr.focal && `${gr.focal}mm`].filter(Boolean).join(" "), gr.stock?.name.replace(/（.*?）/, "")].filter(Boolean).join("　");
+    html += `<figure class="hero ${fresh ? "fresh" : ""}" data-v="${cur.v}"><div class="frame"><img src="${fileUrl(cur.file)}?t=${encodeURIComponent(cur.finished || "")}"><i></i><i></i><i></i><i></i></div>
+    <div class="osd"><span>${esc(osd)}</span><span>${RATIO_ZH[st.project.ratio]?.split(" ")[1] || ""}</span></div>
+    <figcaption><span class="tally ${shotTally(s)}"></span><b>v${cur.v}</b> 現行 ${fresh ? '<span class="badge ok">剛完成</span>' : ""}<span class="muted">${esc(cur.finished || "")}　點圖看原尺寸與提示詞</span></figcaption></figure>`;
+  }
   return html;
 }
 
@@ -1050,6 +1081,7 @@ function renderVersions() {
   const failed = vers.filter(v => v.status === "failed").map(v => v.v);
   const tools = $("#verTools");
   if (tools) tools.innerHTML = failed.length ? `<button class="small ghost" data-delfailed="${failed.join(",")}">清除失敗紀錄（${failed.length}）</button>` : "";
+  updateSummaries();
   if (st.scrollHero && st.justDone?.startsWith(s.id + ":")) { st.scrollHero = false; box.querySelector(".hero")?.scrollIntoView({ behavior: "smooth", block: "center" }); }
 }
 
@@ -1167,7 +1199,7 @@ function renderStrip() {
     const g = st.gens[s.id], v = g?.versions.find(x => x.v === g.current);
     const errs = checkShot(s, p).filter(w => w.level === "error").length;
     return `<div class="shot ${s.id === st.cur ? "on" : ""}" data-shot="${esc(s.id)}">
-      <div class="th">${v?.file ? `<img src="${fileUrl(v.file)}">` : (s.z ? `${esc(s.z)}·${esc(s.y || "?")}` : "—")}${activeJobs(s.id).length ? '<div class="th-busy"><div class="spin"></div></div>' : ""}${s.previs?.path ? '<span class="th-tag">預演</span>' : ""}${s.seedance?.prompt ? '<span class="th-tag sd">SD</span>' : ""}${openNotes(s).length ? `<span class="th-tag note">✎${openNotes(s).length}</span>` : newReplies(s) ? '<span class="th-tag note reply">↳ 回覆</span>' : ""}</div>
+      <div class="th"><span class="tally ${shotTally(s)}"></span>${v?.file ? `<img src="${fileUrl(v.file)}">` : (s.z ? `${esc(s.z)} ${esc(s.y || "?")}` : "—")}${activeJobs(s.id).length ? '<div class="th-busy"><div class="spin"></div></div>' : ""}${s.previs?.path ? '<span class="th-tag">預演</span>' : ""}${s.seedance?.prompt ? '<span class="th-tag sd">SD</span>' : ""}${openNotes(s).length ? `<span class="th-tag note">✎${openNotes(s).length}</span>` : newReplies(s) ? '<span class="th-tag note reply">↳ 回覆</span>' : ""}</div>
       <div class="id">${esc(s.id)} ${errs ? '<span class="badge err">!</span>' : ""} ${esc(s.title || "")}</div>
       <div class="cd">${esc(codeLine(s, p) || "未設定")}</div></div>`;
   }).join("") + `<div class="shot add" id="addShot" title="新增分鏡">＋</div>`;
@@ -1226,7 +1258,7 @@ async function refreshGens(force) {
     }
     const active = st.queue.filter(j => j.state === "queued" || j.state === "running");
     const run = active.find(j => j.state === "running");
-    $("#queueInfo").innerHTML = active.length ? `<span class="spin tiny"></span> 生成中：${run ? `${esc(run.shot_id)} v${run.v}（<span data-start="${startOf(run)}">${mmss(Date.now() - startOf(run))}</span>，${esc(run.tail || "")}）` : "—"}　等待 ${active.length - (run ? 1 : 0)}` : "";
+    $("#queueInfo").innerHTML = active.length ? `<span class="tally wait pulse"></span> 生成中：${run ? `${esc(run.shot_id)} v${run.v}（<span data-start="${startOf(run)}">${mmss(Date.now() - startOf(run))}</span>，${esc(run.tail || "")}）` : "—"}　等待 ${active.length - (run ? 1 : 0)}` : "";
     st.pollTick = (st.pollTick || 0) + 1;  // 每 10 秒也讀一次：別的分頁或程式匯入的版本也會出現
     if (force || st.queue.some(j => j.state === "queued" || j.state === "running") || st._hadQueue || st.pollTick % 5 === 0) {
       st.gens = await api(`/api/gens?${q()}`);
@@ -1330,11 +1362,18 @@ document.addEventListener("click", e => {
 
   if (t.closest("#stripBar")) { localSet("studio.stripCollapsed", localGet("studio.stripCollapsed") === "1" ? "0" : "1"); renderStripBar(); return; }
   if (!t.closest("#editor")) return;
-  const sec = t.closest("[data-sectoggle]");
-  if (sec) { toggleSection(sec.dataset.sectoggle); return; }
-  const all = t.closest("[data-secall]");
-  if (all) { for (const c of document.querySelectorAll("#editor .card[data-sec]")) toggleSection(c.dataset.sec, all.dataset.secall === "open"); return; }
+  const pn = t.closest("[data-panel]");
+  if (pn) { setPanel(pn.dataset.panel); return; }
   const s = shot(); if (!s) return;
+  if (t.id === "viewGen") { openGenerate(); return; }
+  const rv = t.closest("[data-review]");
+  if (rv) {
+    const g = st.gens[s.id];
+    if (!g?.current) return toast("還沒有現行版本");
+    api(`/api/gens/set?${q()}`, { method: "POST", body: JSON.stringify({ shot_id: s.id, v: g.current, review: rv.dataset.review }) })
+      .then(() => refreshGens(true)).then(() => toast(`v${g.current} ${rv.dataset.review === "approved" ? "已核可" : "已退回"}`)).catch(e => toast(e.message));
+    return;
+  }
   if (t.closest("[data-rewrite]") || t.id === "rewriteBtn" || t.id === "rewriteAgain") { if (st.rewrite?.state !== "busy") rewriteAction(); return; }
   if (t.id === "rewriteCancel") { st.rewrite = null; renderRewrite(); return; }
   if (t.id === "rewriteApply") {
@@ -1428,7 +1467,7 @@ document.addEventListener("click", e => {
 
 document.addEventListener("input", e => {
   const s = shot();
-  if (e.target.id === "fTitle") { s.title = e.target.value; save(); renderStrip(); }
+  if (e.target.id === "fTitle") { s.title = e.target.value; save(); renderStrip(); updateSummaries(); }
   else if (e.target.id === "fAction") { s.action = e.target.value; save(); refreshDerived(); renderStrip(); }
   else if (e.target.id === "promptEn") onPromptInput(e);
   else if (["sdReq", "sdDur", "sdEngine", "sdPrompt"].includes(e.target.id)) {

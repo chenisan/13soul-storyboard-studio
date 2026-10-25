@@ -25,22 +25,22 @@ export class Stage {
     this.el.appendChild(this.hud);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x15171a);
-    this.scene.fog = new THREE.Fog(0x15171a, 30, 90);
+    this.scene.background = new THREE.Color(0x303030);
+    this.scene.fog = new THREE.Fog(0x303030, 30, 90);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x404040, 1.6));
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(4, 8, 3);
     this.scene.add(sun);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshLambertMaterial({ color: 0x24272b }));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshLambertMaterial({ color: 0x3a3a3a }));
     ground.rotation.x = -Math.PI / 2;
     ground.name = "ground";
     this.ground = ground;
     this.scene.add(ground);
-    this.grid = new THREE.GridHelper(40, 40, 0x50555c, 0x34383d);
+    this.grid = new THREE.GridHelper(40, 40, 0x5c5c5c, 0x464646);
     this.grid.position.y = 0.002;
     this.scene.add(this.grid);
     // 正北標記：-Z 方向
-    const north = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.6, 3), new THREE.MeshBasicMaterial({ color: 0x50555c }));
+    const north = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.6, 3), new THREE.MeshBasicMaterial({ color: 0x5c5c5c }));
     north.rotation.x = -Math.PI / 2; north.position.set(0, 0.01, -19);
     this.scene.add(north);
 

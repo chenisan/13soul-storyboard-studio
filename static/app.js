@@ -25,14 +25,45 @@ const fileUrl = path => `/files/${encodeURIComponent(st.P)}/${path.split("/").ma
 let saveTimer;
 function save() {
   $("#saveState").textContent = "儲存中…";
+  st.saving = true;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
-      await api(`/api/project?${q()}`, { method: "POST", body: JSON.stringify(st.project) });
+      const { rev } = await api(`/api/project?${q()}`, { method: "POST", body: JSON.stringify(st.project) });
+      st.project._rev = rev;
       $("#saveState").textContent = "已儲存";
-    } catch (e) { $("#saveState").textContent = "儲存失敗：" + e.message; }
+    } catch (e) {
+      if (e.message === "conflict") {  // 專案在別處被改過（指令匯入、另一個分頁）：不覆蓋，改成重新載入
+        toast("這個專案剛在別處被修改（例如指令匯入），已重新載入；你最後一個修改沒有存到，請再做一次");
+        await reloadProject();
+      } else $("#saveState").textContent = "儲存失敗：" + e.message;
+    } finally { st.saving = false; }
   }, 400);
 }
+
+// 重新讀取專案（保留目前選的分鏡）
+async function reloadProject() {
+  st.project = await api(`/api/project?${q()}`);
+  st.project.characters ??= []; st.project.scenes ??= []; st.project.shots ??= [];
+  st.gens = await api(`/api/gens?${q()}`);
+  if (!st.project.shots.some(s => s.id === st.cur)) st.cur = st.project.shots[0]?.id || null;
+  renderAll();
+  $("#saveState").textContent = "已重新載入";
+}
+
+// 每 10 秒看專案有沒有在別處被改；沒在編輯時直接重新載入
+async function checkProjectRev() {
+  if (!st.P || !st.project || st.saving) return;
+  try {
+    const { rev } = await api(`/api/project_rev?${q()}`);
+    if (rev <= (st.project._rev || 0)) return;
+    const editing = $("#dlg").open || document.activeElement?.matches?.("input, textarea, select");
+    if (editing) { $("#saveState").textContent = "專案已在別處更新，編輯完會自動重新載入"; return; }
+    await reloadProject();
+    toast("專案已在別處更新（例如指令匯入），已重新載入");
+  } catch { /* 後端重啟中 */ }
+}
+setInterval(checkProjectRev, 10000);
 
 function toast(msg) {
   const t = $("#toast");

@@ -7,3 +7,6 @@ local/
 __pycache__/
 *.pyc
 *.tmp
+
+# 指令工具用的分鏡計畫檔（個人專案內容）
+plans/

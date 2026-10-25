@@ -384,6 +384,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(sorted(d.name for d in PROJECTS.iterdir() if (d / "project.json").exists()))
             if path == "/api/project":
                 return self.send_json(read_json(project_dir(q["p"]) / "project.json", None))
+            if path == "/api/project_rev":
+                return self.send_json({"rev": (read_json(project_dir(q["p"]) / "project.json", None) or {}).get("_rev", 0)})
             if path == "/api/gens":
                 with lock:
                     return self.send_json(read_json(gens_path(q["p"]), {}))
@@ -420,9 +422,17 @@ class Handler(BaseHTTPRequestHandler):
                     write_json(pj, new_project(name))
                 return self.send_json({"name": name})
             if path == "/api/project":
+                # 版本號 _rev：網頁、指令工具、範例腳本都可能改同一個專案，對不上就拒絕，避免整份互相覆蓋
                 data = json.loads(self.body())
-                write_json(project_dir(q["p"]) / "project.json", data)
-                return self.send_json({"ok": True})
+                pj = project_dir(q["p"]) / "project.json"
+                with lock:
+                    cur = read_json(pj, None)
+                    cur_rev = (cur or {}).get("_rev", 0)
+                    if cur is not None and data.get("_rev", 0) != cur_rev:
+                        return self.send_json({"error": "conflict", "rev": cur_rev}, 409)
+                    data["_rev"] = cur_rev + 1
+                    write_json(pj, data)
+                return self.send_json({"ok": True, "rev": data["_rev"]})
             if path == "/api/upload":  # 原始位元組上傳：?p=&kind=characters|scenes|refs&name=
                 kind = q["kind"]
                 if kind not in KINDS:

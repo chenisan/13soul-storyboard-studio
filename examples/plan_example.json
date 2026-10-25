@@ -1,0 +1,66 @@
+{
+  "project": "範例_雨夜巷口",
+  "ratio": "youtube",
+  "lang": "zh",
+  "gear": { "body": "arricam", "lens": "cooke_panchro", "stock": "v3_500t_push" },
+  "characters": [
+    {
+      "name": "小雨",
+      "name_en": "Yu",
+      "image": "images/yu_character_sheet.png",
+      "lock": "黑色及肩短髮，素顏，身形纖細",
+      "outfit": "深灰色連帽雨衣，舊牛仔褲，黑色帆布鞋"
+    },
+    {
+      "name": "阿哲",
+      "name_en": "Zhe",
+      "image": "images/zhe_character_sheet.png",
+      "lock": "平頭，下巴有短鬍渣，眼神疲憊",
+      "outfit": "濕透的黑色夾克，白色 T 恤"
+    }
+  ],
+  "scenes": [
+    {
+      "name": "巷口",
+      "name_en": "the alley entrance",
+      "image": "images/alley_plate.png",
+      "desc": "老城區的窄巷口，霓虹招牌在雨中暈開，地面乾燥只有零星水漬，路燈從右上方打下"
+    }
+  ],
+  "shots": [
+    {
+      "title": "定場：巷口",
+      "chars": ["小雨"],
+      "scene": "巷口",
+      "z": "Z8", "y": "Y5", "x": "X5",
+      "m": "crane_down",
+      "action": "小雨撐著傘站在巷口，背對鏡頭望向巷子深處"
+    },
+    {
+      "title": "阿哲出現",
+      "chars": ["阿哲"],
+      "scene": "巷口",
+      "z": "Z6", "y": "Y3", "x": "X1",
+      "mods": ["輪廓光"],
+      "action": "阿哲從巷子深處走出來，停在路燈下"
+    },
+    {
+      "title": "對望",
+      "chars": ["小雨", "阿哲"],
+      "subject": "小雨",
+      "scene": "巷口",
+      "z": "Z4", "y": "Y4", "x": "X5",
+      "r": "ots",
+      "focal": 85,
+      "action": "兩人隔著雨幕對望，阿哲先開口"
+    },
+    {
+      "title": "小雨的反應",
+      "chars": ["小雨"],
+      "scene": "巷口",
+      "z": "Z2", "y": "Y4", "x": "X2",
+      "mods": ["大光圈虛化"],
+      "action": "小雨眼眶泛紅，強忍著不說話"
+    }
+  ]
+}

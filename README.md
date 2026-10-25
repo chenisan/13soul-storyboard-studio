@@ -137,6 +137,31 @@ python tools/codex_image_gen.py "a red apple on a wooden table" --out test_outpu
 - 攝影設備可以在「專案設定」設預設，每顆分鏡再個別覆蓋。
 - 提示詞會同時寫設備名稱和光學特徵；3D 導演台依「片幅＋焦段」計算視角。
 
+## 指令工具（先用指令出主要分鏡，再到網頁細修）
+
+`studio.mjs` 可以用指令建立專案、匯入整份分鏡計畫、檢查、送生成。提示詞和規則檢查用的是網頁同一份程式，結果一致。需要服務正在執行。
+
+```
+node studio.mjs new <專案> [--ratio youtube|reel|square] [--lang zh|en]
+node studio.mjs import <計畫檔.json> [--replace] [--dry-run]
+node studio.mjs list <專案>
+node studio.mjs export <專案> [輸出檔.json]
+node studio.mjs gen <專案> <S01,S02|all> [--missing] [--yes]
+node studio.mjs status
+```
+
+- **分鏡計畫檔**：JSON，寫專案、角色（名稱、角色卡圖片、鎖定描述）、場景、每顆分鏡（景別 z、俯仰 y、方位 x、關係 r、運鏡 m、修飾、焦段、畫面內容）。範例見 `examples/plan_example.json`。角色、場景、修飾、鏡頭都可以用名稱寫，例如修飾寫「輪廓光」。圖片路徑以計畫檔所在資料夾為準。
+- **import**：
+  - 先檢查整份，有任何錯誤（代碼寫錯、角色名稱對不上、圖片不存在…）就整份不匯入，並列出所有問題。`--dry-run` 只檢查。
+  - 同名角色、場景沿用，同一張來源圖不重複複製。
+  - 分鏡預設加在後面，`--replace` 整份取代；分鏡寫了 `id` 就更新那一顆。
+  - 新分鏡的代號會接在用過的最大號碼後面，不會和舊版本的圖混在一起。
+- **export → 修改 → import --replace**：用指令大改既有專案。
+- **gen**：沒加 `--yes` 只列出會生成哪些、需要多久，不會送出。`--missing` 只生還沒有圖的。有紅色錯誤的分鏡會略過。網頁上手改過的提示詞優先使用。
+- 網頁開著同一個專案時，匯入後 10 秒內會自動重新載入。專案存檔有版本號，網頁和指令同時修改時，後到的會被拒絕，不會互相覆蓋。
+
+搭配 AI 助理使用時：把劇情交給它拆成計畫檔，`import --dry-run` 檢查，匯入後在網頁看過，確認再 `gen … --yes`。
+
 ## 提示詞語言（中文／英文）
 
 「專案設定」可以選提示詞語言。選中文後：
@@ -240,4 +265,6 @@ projects/<專案>/frames/        生成的首幀 S01_v1.png …；logs/ 是每�
 | `start.bat` | Windows 啟動捷徑用 |
 | `tools/codex_image_gen.py` | 生圖腳本：透過 Codex CLI 的 image_gen 生圖，支援參考圖 |
 | `make_samples.mjs` | 產生範例對照表 |
+| `studio.mjs` | 指令工具：匯入分鏡計畫、檢查、送生成 |
+| `examples/plan_example.json` | 分鏡計畫檔範例 |
 | `static/` | 前端：`app.js` 介面、`camera.js` 鏡頭語言與提示詞、`stagemath.js`／`stage3d.js` 3D 導演台 |

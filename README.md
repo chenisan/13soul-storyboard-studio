@@ -255,6 +255,8 @@ projects/<專案>/frames/        生成的首幀 S01_v1.png …；logs/ 是每�
 
 實測整理的生圖經驗（哪些鏡頭指令有效、角色描述怎麼寫、Midjourney 注意事項）見 [chatgpt生成圖踩坑記錄.md](chatgpt生成圖踩坑記錄.md)。
 
+要接手開發：架構、設計決策、測試方法與待辦見 [導演台開發handoff.md](導演台開發handoff.md)。
+
 ## 檔案
 
 | 檔案 | 說明 |

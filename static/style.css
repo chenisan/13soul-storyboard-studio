@@ -25,6 +25,27 @@ textarea { width: 100%; resize: vertical; line-height: 1.5; }
 
 .top { display: flex; gap: 8px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
 .top h1 { font-size: 16px; margin: 0 8px 0 0; color: var(--accent2); letter-spacing: .1em; }
+.top .brand { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; white-space: nowrap; }
+.brand { color: inherit; text-decoration: none; }
+.brand:hover { opacity: .8; }
+.brand:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; }
+.brand-name { font-family: var(--tc); font-size: 26px; font-weight: 600; line-height: 1; letter-spacing: .02em; }
+.brand-title { border-left: 1px solid var(--line); padding-left: 10px; font-size: 14px; font-weight: 500; letter-spacing: .12em; }
+.channel-promo { width: min(760px, 92vw); }
+.channel-promo-banner { display: block; width: 100%; height: auto; }
+.channel-promo .channel-promo-body { padding: 28px; gap: 16px; }
+.channel-promo-close { position: absolute; top: 10px; right: 10px; font-size: 22px; line-height: 1; padding: 5px 9px; }
+.channel-promo .channel-promo-close { background: var(--panel2); border-color: var(--muted); }
+.channel-promo-identity { display: flex; align-items: center; gap: 18px; }
+.channel-promo-avatar { flex: none; width: 80px; height: 80px; border-radius: 50%; object-fit: cover; }
+.channel-promo-label { font-size: 11px; color: var(--muted); letter-spacing: .15em; }
+.channel-promo h2 { font-family: var(--tc); font-size: clamp(36px, 8vw, 64px); font-weight: 600; line-height: 1; letter-spacing: .02em; margin: 0; }
+.channel-promo h2 span { font-size: .5em; font-weight: 400; color: var(--muted); }
+.channel-promo p { margin: 0; line-height: 1.9; }
+.channel-promo-handle { color: var(--muted); font-family: var(--tc); font-size: 20px; }
+.channel-promo-actions { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 16px; border-top: 1px solid var(--line); }
+.channel-promo-actions a { text-decoration: none; }
+.channel-promo-actions a:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .queue { font-size: 12px; color: var(--accent2); }
 
 .layout { flex: 1; display: grid; grid-template-columns: 1fr; min-height: 0; }

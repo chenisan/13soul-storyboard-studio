@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>分鏡設計台</title>
+<title>13soul 導演台</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
@@ -11,7 +11,7 @@
 </head>
 <body>
 <header class="top">
-  <h1>分鏡設計台</h1>
+  <h1><a class="brand" href="https://www.youtube.com/@13Neosoul" target="_blank" rel="noopener noreferrer" aria-label="13soul 導演台，開啟 YouTube 頻道（新分頁）"><span class="brand-name">13soul</span><span class="brand-title">導演台</span></a></h1>
   <select id="projectSel" title="專案"></select>
   <span id="queueInfo" class="queue"></span>
   <span class="grow"></span>
@@ -63,8 +63,26 @@
 
 <dialog id="dlg"><form method="dialog" id="dlgBody"></form></dialog>
 <dialog id="lightbox" class="lightbox" aria-label="範例大圖"></dialog>
+<dialog id="channelPromo" class="channel-promo" aria-labelledby="channelPromoTitle" aria-describedby="channelPromoDesc">
+  <img class="channel-promo-banner" src="/static/brand/channel-banner.jpg" alt="13soul music 頻道 Banner：夕陽下的音樂工作室">
+  <form method="dialog" class="channel-promo-body">
+    <button class="ghost channel-promo-close" aria-label="關閉頻道宣傳，進入導演台" autofocus>×</button>
+    <span class="channel-promo-label">創作者頻道 · YOUTUBE</span>
+    <div class="channel-promo-identity">
+      <img class="channel-promo-avatar" src="/static/brand/channel-avatar.jpg" alt="13soul 頻道大頭貼" width="80" height="80">
+      <h2 id="channelPromoTitle">13soul <span>music</span></h2>
+    </div>
+    <p id="channelPromoDesc">歡迎來到 13soul 導演台。<br>前往我的 YouTube 頻道，看看我的作品。</p>
+    <span class="channel-promo-handle">@13Neosoul</span>
+    <div class="channel-promo-actions">
+      <a class="btn" href="https://www.youtube.com/@13Neosoul" target="_blank" rel="noopener noreferrer">前往頻道 ↗</a>
+      <button class="ghost">關閉，進入導演台</button>
+    </div>
+  </form>
+</dialog>
 <div id="toast" class="toast"></div>
 <div id="sampleTip" class="sample-tip" hidden></div>
 <script type="module" src="/static/app.js"></script>
+<script type="module" src="/static/channel-promo.js"></script>
 </body>
 </html>

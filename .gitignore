@@ -2,6 +2,7 @@
 .env
 projects/
 local/
+docs/
 
 # Python
 __pycache__/
